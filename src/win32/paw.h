@@ -14,9 +14,9 @@ struct _pawPid {
 struct _pawGlance {
 	HANDLE	hGlance;
 	PROCESSENTRY32	pe32Entry;
-	PROCESSENTRY32W	pe32wEntry;
+	//PROCESSENTRY32W	pe32wEntry;
 	MODULEENTRY32	me32Entry;
-	MODULEENTRY32W	me32wEntry;
+	//MODULEENTRY32W	me32wEntry;
 	DWORD	dwFlags;
 	DWORD	dwParent;
 	pawu_t	uPidCount;
