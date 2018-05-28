@@ -12,26 +12,24 @@ struct _pawPid {
 	DWORD pid;
 }
 struct _pawGlance {
-	HANDLE glance_tlhelp32;
-	unsigned int glance_psapi_c;
-	int * glance_psapi_v;
+	HANDLE	hGlance;
+	PROCESSENTRY32	pe32Entry;
+	PROCESSENTRY32W	pe32wEntry;
+	MODULEENTRY32	me32Entry;
+	MODULEENTRY32W	me32wEntry;
+	DWORD	dwFlags;
+	DWORD	dwParent;
+	pawu_t	uPidCount;
+	pawu_t	uPidIndex;
+	DWORD *	dwPidBuff;
+	pawu_t	uLidCount;
+	pawu_t	uLidIndex;
+	DWORD *	dwLidBuff;
 };
-struct _pawGlanceProcessA {
-	PROCESSENTRY32 entry_tlhelp32;
-};
-struct _pawGlanceProcessW {
-	PROCESSENTRY32W entry_tlhelp32;
-};
-struct _pawGlanceLibraryA {
-	MODULEENTRY32 entry_tlhelp32;
-};
-struct _pawGlanceLibraryW {
-	MODULEENTRY32W entry_tlhelp32;
-};
-struct _pawProcessA { HANDLE hProcess; };
-struct _pawProcessW { HANDLE hProcess; };
-struct _pawLibraryA { HMODULE hLibrary; };
-struct _pawLibraryW { HMODULE hLibrary; };
+
+struct _pawProcess { HANDLE hProcess; };
+struct _pawLibrary { HMODULE hLibrary; };
+struct _pawSupport { HANDLE hSupport; };
 
 typedef HANDLE (WINAPI *CreateToolhelp32Snapshot_t)(
 	DWORD flags, DWORD id );
@@ -46,9 +44,23 @@ typedef BOOL (WINAPI *Process32NextW_t)(
 	
 typedef BOOL (WINAPI *EnumProcesses_t)(
 	DWORD *p_dwPids, DWORD cbCap, DWORD *p_cbSet );
+	
+typedef BOOL (WINAPI *QueryFullProcessImageNameA_t)(
+	HANDLE hProcess, DWORD  dwFlags, LPSTR strDst, PDWORD p_dwCap );
+
+typedef BOOL (WINAPI *QueryFullProcessImageNameW_t)(
+	HANDLE hProcess, DWORD  dwFlags, LPWSTR wcsDst, PDWORD p_dwCap );
 
 typedef BOOL (WINAPI *GetPerformanceInfo_t)(
-  PPERFORMANCE_INFORMATION pPerformanceInformation, DWORD cbSize );
+	PPERFORMANCE_INFORMATION pPerformanceInformation, DWORD cbSize );
+	
+typedef NTSTATUS (NTAPI
+*NtQueryInformationProcess_t)(
+    HANDLE ProcessHandle,
+    PROCESSINFOCLASS ProcessInformationClass,
+    PVOID ProcessInformation,
+    ULONG ProcessInformationLength,
+    PULONG ReturnLength );
 	
 #define PAW_F_LIBRARY_LISTDEF 0uL
 #define PAW_F_LIBRARY_LIST_32 1uL

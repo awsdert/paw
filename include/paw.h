@@ -15,16 +15,13 @@ typedef signed int pawi_t;
 typedef unsigned int pawu_t;
 typedef signed long pawl_t;
 typedef unsigned long pawul_t;
-typedef struct _pawPid pawPid_t;
+typedef signed long long pawll_t;
+typedef unsigned long long pawull_t;
+typedef struct _pawId pawId_t;
 typedef struct _pawGlance pawGlance_t;
-typedef struct _pawGlanceProcessA pawGlanceProcessA_t;
-typedef struct _pawGlanceProcessW pawGlanceProcessW_t;
-typedef struct _pawGlanceLibraryA pawGlanceLibraryA_t;
-typedef struct _pawGlanceLibraryW pawGlanceLibraryW_t;
-typedef struct _pawProcessA pawProcessA_t;
-typedef struct _pawProcessW pawProcessW_t;
-typedef struct _pawLibraryA pawLibraryA_t;
-typedef struct _pawLibraryW pawLibraryW_t;
+typedef struct _pawProcess pawProcess_t;
+typedef struct _pawLibrary pawLibrary_t;
+typedef struct _pawSupport pawSupport_t;
 
 // DO NOT CHANGE, must be consistent across DLLs
 typedef struct _pawMemStat
@@ -114,6 +111,8 @@ else will default to normal OpenProcess type calls */
 // Do not move/delete these enums
 enum {
 	PAW_E_BASEAPI_INVAL = 0,
+	PAW_E_BASEAPI_K32_TLH32,
+	PAW_E_BASEAPI_K32_PSAPI,
 	PAW_E_BASEAPI_TLH32,
 	PAW_E_BASEAPI_PSAPI,
 	PAW_E_BASEAPI_POSIX,
@@ -125,32 +124,20 @@ typedef struct pawAPI {
 	// Hacks should rely on these for consistency across DLL versions
 	pawul_t ulVersion;
 	pawul_t ulBaseAPI;
-	_Bool (*pawGlanceNew)(
-		pawGlance_t *glance, pawul_t flags, pawPid_t id );
-		pawu_t (*pawGlancePIDs)( pawPid_t *PIDs, pawu_t PIDc );
-	_Bool (*pawGlance1stProcessA)(
-		pawGlance_t *glance, pawGlanceProcessA_t *process );
-	_Bool (*pawGlance1stProcessW)(
-		pawGlance_t *glance, pawGlanceProcessW_t *process );
-	_Bool (*pawGlanceNxtProcessA)(
-		pawGlance_t *glance, pawGlanceProcessA_t *process );
-	_Bool (*pawGlanceNxtProcessW)(
-		pawGlance_t *glance, pawGlanceProcessW_t *process );
-	_Bool (*pawRecentMemStatA)(
-		pawGlanceProcessA_t *process, pawMemStat_t *memstat );
-	_Bool (*pawRecentMemStatW)(
-		pawGlanceProcessW_t *process, pawMemStat_t *memstat );
-	_Bool (*pawGlance1stLibraryA)(
-		pawGlance_t *glance, pawGlanceLibraryA_t *library );
-	_Bool (*pawGlance1stLibraryW)(
-		pawGlance_t *glance, pawGlanceLibraryW_t *library );
-	_Bool (*pawGlanceNxtLibraryA)(
-		pawGlance_t *glance, pawGlanceLibraryA_t *library );
-	_Bool (*pawGlanceNxtLibraryW)(
-		pawGlance_t *glance, pawGlanceLibraryW_t *library );
+	_Bool (*pawGlanceNew)( pawGlance_t *glance, pawul_t flags, pawPid_t id );
+	pawu_t (*pawGlancePIDs)( pawPid_t *PIDs, pawu_t PIDc );
+	pawu_t (*pawGlanceMIDs)( pawMid_t *MIDs, pawu_t MIDc );
+	pawu_t (*pawGlanceTIDs)( pawTid_t *TIDs, pawu_t TIDc );
+	_Bool (*pawMemoryStats)( pawProcess_t *process, pawMemStat_t *memstat );
+	_Bool (*pawProcessExeA)( pawProcess_t *process, char *dstA, pawu_t uCap );
+	_Bool (*pawProcessExeW)( pawProcess_t *process, char *dstW, pawu_t uCap );
+	_Bool (*pawGlance1stProcess)( pawGlance_t *glance );
+	_Bool (*pawGlanceNxtProcess)( pawGlance_t *glance );
+	_Bool (*pawGlance1stLibrary)( pawGlance_t *glance );
+	_Bool (*pawGlanceNxtLibrary)( pawGlance_t *glance );
 	_Bool (*pawGlanceDel)( pawGlance_t *glance );
 	_Bool (*pawGripProcess)(
-		pawProcess_t *process, size_t wantAccess, size_t wantHandle, int id );
+		pawProcess_t *process, size_t wantAccess, size_t bShareHandles, int id );
 	_Bool (*pawFreeProcess)( pawProcess_t *process );
 	_Bool (*pawGrabLibrary)(
 		pawProcess_t *process, pawLibrary_t *library, char *path );
