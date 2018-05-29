@@ -1,9 +1,13 @@
 TOP?=../
-SYS:=$(if ${.ProgramFiles},posix,win32)
-SYS32?=$(if ${.ProgramFiles},,$(if {.ProgramFiles_x86},64,32))
-LIB_PFX:=$(if ${.ProgramFiles},lib,)
-LIB_SFX:=$(SYS32)$(if ${.ProgramFiles},.so,.dll)
-EXE_SFX:=$(SYS32)$(if ${.ProgramFiles},,.exe)
+IS_WIN64:=$(if ${ProgramW6432},1,)
+IS_WIN32:=$(if ${ProgramFiles},$(if $(IS_WIN64),,1),)
+IS_MSWIN:=$(if $(or $(IS_WIN64),$(IS_WIN32)),1,)
+IS_POSIX:=$(if $(IS_MSWIN),,1)
+SYS:=$(if $(IS_MSWIN),win32,posix)
+SYS32?=$(if $(IS_MSWIN),$(if $(IS_WIN64),64,32),)
+LIB_PFX:=$(if $(IS_MSWIN),,lib)
+LIB_SFX:=$(SYS32)$(if $(IS_MSWIN),.dll,.so)
+EXE_SFX:=$(SYS32)$(if $(IS_MSWIN),.exe,)
 APP_SFX:=$(SYS32)$(EXE_SFX)
 
 PAW_INC_DIR:=$(TOP)include
