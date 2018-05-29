@@ -7,7 +7,7 @@ SYS:=$(if $(IS_MSWIN),win32,posix)
 SYS32?=$(if $(IS_MSWIN),$(if $(IS_WIN64),64,32),)
 LIB_PFX:=$(if $(IS_MSWIN),,lib)
 LIB_SFX:=$(SYS32)$(if $(IS_MSWIN),.dll,.so)
-EXE_SFX:=$(SYS32)$(if $(IS_MSWIN),.exe,)
+EXE_SFX:=$(if $(IS_MSWIN),.exe,)
 APP_SFX:=$(SYS32)$(EXE_SFX)
 
 PAW_INC_DIR:=$(TOP)include
