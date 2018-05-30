@@ -1,4 +1,8 @@
-#include <paw.h>
+#ifdef DEF_DEP
+shared.c: shared.h
+#else
+#	include <windows.h>
+#	include <paw.h>
 BOOL WINAPI DllMain(
   HINSTANCE hinstDLL,
   DWORD     fdwReason,
@@ -13,3 +17,4 @@ BOOL WINAPI DllMain(
   }
   return TRUE;
 }
+#endif

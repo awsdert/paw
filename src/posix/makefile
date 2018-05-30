@@ -1,2 +1,2 @@
 TOP:=../../
-include $(TOP)src/makefile.mak
+include $(TOP)src/makefile

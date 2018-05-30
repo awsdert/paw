@@ -124,11 +124,11 @@ typedef struct pawAPI {
 	// Hacks should rely on these for consistency across DLL versions
 	pawul_t ulVersion;
 	pawul_t ulBaseAPI;
-	_Bool (*pawGlanceNew)( pawGlance_t *glance, pawul_t flags, pawPid_t id );
-	pawu_t (*pawGlancePIDs)( pawPid_t *PIDs, pawu_t PIDc );
-	pawu_t (*pawGlanceMIDs)( pawMid_t *MIDs, pawu_t MIDc );
-	pawu_t (*pawGlanceTIDs)( pawTid_t *TIDs, pawu_t TIDc );
-	_Bool (*pawMemoryStats)( pawProcess_t *process, pawMemStat_t *memstat );
+	_Bool (*pawGlanceNew)( pawGlance_t *glance, pawul_t flags, pawId_t id );
+	pawu_t (*pawGlancePIDs)( pawId_t *PIDs, pawu_t PIDc );
+	pawu_t (*pawGlanceMIDs)( pawId_t *MIDs, pawu_t MIDc );
+	pawu_t (*pawGlanceTIDs)( pawId_t *TIDs, pawu_t TIDc );
+	pawMemStat_t (*pawMemoryStats)( pawId_t id );
 	_Bool (*pawProcessExeA)( pawProcess_t *process, char *dstA, pawu_t uCap );
 	_Bool (*pawProcessExeW)( pawProcess_t *process, char *dstW, pawu_t uCap );
 	_Bool (*pawGlance1stProcess)( pawGlance_t *glance );

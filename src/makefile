@@ -13,9 +13,9 @@ APP_SFX:=$(SYS32)$(EXE_SFX)
 PAW_INC_DIR:=$(TOP)include
 PAW_SRC_DIR:=$(TOP)src
 
-PAW_SRC:=$(SYS)/paw.c
+PAW_SRC:=$(PAW_SRC_DIR)/$(SYS)/paw.c $(PAW_SRC_DIR)/$(SYS)/shared.c
 PAW_CPP:=
-PAW_INC:=$(SYS)/paw.h
+PAW_INC:=$(PAW_SRC_DIR)/$(SYS)/paw.h $(PAW_INC_DIR)/paw.h
 PAW_OBJ:=$(PAW_SRC:%.c=%.c.o) $(PAW_CPP:%.cpp=%.cpp.o)
 PAW_MAK:=$(PAW_INC:%.h=%.h.mak) $(PAW_SRC:%.c=%.c.mak)
 
@@ -23,21 +23,22 @@ VPATHS:="$(PAW_SRC_DIR)";"$(PAW_INC_DIR)"
 
 CC:=gcc
 IFLAGS:=-I"$(PAW_INC_DIR)" -I"$(PAW_SRC_DIR)"
+LFLAGS:=-shared -L"$(PAW_INC_DIR)" -L"$(PAW_SRC_DIR)" -l
 CFLAGS:=$(IFLAGS)
 MFLAGS:=$(IFLAGS) -E -DDEF_DEP
-
-include $(PAW_MAK)
 
 # Compile everything
 
 all: test
 	@echo all
 
+include $(PAW_MAK)
+
 # Compile paw into a library file
 
-shared: $(PAW_SRC) $(PAW_OBJ)
+shared: $(PAW_OBJ)
 	@echo shared
-	$(CC) $(IFLAGS) -shared $(PAW_OBJ) -o $(LIB_PFX)paw$(LIB_SFX)
+	$(CC) $(LFLAGS) $(patsubst %,"%",$(PAW_OBJ)) -o $(LIB_PFX)paw$(LIB_SFX)
 
 # Compile a test app
 
@@ -49,6 +50,7 @@ test: shared $(SYS)/test.c
 
 %.mak:
 	@echo %%.mak
+	@echo MINGW:$(MINGW)
 	$(CC) "$(patsubst %.mak,%,$@)" -o "$@" $(MFLAGS)
 
 # Compile *.o options
@@ -60,4 +62,5 @@ test: shared $(SYS)/test.c
 %.cpp.o: %.cpp
 	@echo %%.cpp
 	$(CC) -c "$^" -o "$@" $(CFLAGS)
-
+	
+.FORCE:

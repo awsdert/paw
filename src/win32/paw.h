@@ -1,16 +1,17 @@
-#include <paw.h>
 #ifndef INC_WIN32_PAW_H
 #	define INC_WIN32_PAW_H
 #	ifdef DEF_DEP
 win32/paw.h: paw.h
 #	else
 #		include <paw.h>
+#		include <Winternl.h>
+#		include <windows.h>
 #		include <psapi.h>
 #		include <tlhelp32.h>
 
-struct _pawPid {
-	DWORD pid;
-}
+struct _pawId {
+	DWORD dwId;
+};
 struct _pawGlance {
 	HANDLE	hGlance;
 	PROCESSENTRY32	pe32Entry;
@@ -41,6 +42,14 @@ typedef BOOL (WINAPI *Process32Next_t)(
 	HANDLE hSnapshot, PROCESSENTRY32 *p_pe32Entry );
 typedef BOOL (WINAPI *Process32NextW_t)(
 	HANDLE hSnapshot, PROCESSENTRY32W *p_pe32Entry );
+typedef BOOL (WINAPI *Module32First_t)(
+	HANDLE hSnapshot, MODULEENTRY32 *p_pe32Entry );
+typedef BOOL (WINAPI *Module32FirstW_t)(
+	HANDLE hSnapshot, MODULEENTRY32W *p_pe32Entry );
+typedef BOOL (WINAPI *Module32Next_t)(
+	HANDLE hSnapshot, MODULEENTRY32 *p_pe32Entry );
+typedef BOOL (WINAPI *Module32NextW_t)(
+	HANDLE hSnapshot, MODULEENTRY32W *p_pe32Entry );
 	
 typedef BOOL (WINAPI *EnumProcesses_t)(
 	DWORD *p_dwPids, DWORD cbCap, DWORD *p_cbSet );
