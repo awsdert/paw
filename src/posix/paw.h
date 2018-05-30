@@ -7,7 +7,6 @@ posix/paw.h: paw.h
 #		include <stddef.h>
 #		include <stdint.h>
 #		include <malloc.h>
-#		include <dirent.h>
 
 struct _pawGlance { DIR *posix_glance; int id; };
 struct _pawGlanceProcessA { struct dirent *posix_entry; };

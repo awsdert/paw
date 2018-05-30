@@ -31,10 +31,10 @@ static QueryFullProcessImageNameW_t  l_QueryFullProcessImageNameW = NULL;
 // Credit to https://www.codeguru.com/cpp/w-p/win32/article.php/c1437/Retrieving-the-parent-of-a-process-WinNT.htm
 
 // 1st API Wrapper
-_Bool pawGlanceNew_tlhelp32( pawGlance_t *glance, pawul_t flags, pawId_t id ) {
+_Bool pawGlanceNew_tlhelp32( pawGlance_t *glance, pawul_t flags, pawId_t *id ) {
 	if ( !glance ) return false;
 	memset( glance, 0, sizeof(pawGlance_t) );
-	glance->hGlance = l_CreateToolhelp32Snapshot( flags, id.dwId );
+	glance->hGlance = l_CreateToolhelp32Snapshot( flags, id->dwId );
 	return glance->hGlance ? true : false;
 }
 _Bool pawGlance1stProcess_tlhelp32( pawGlance_t *glance ) {
@@ -135,14 +135,14 @@ pawAPI_t* pawSetup_tlhelp32() {
 	return &(l_pawAPI[0]);
 }
 // 2nd API Wrapper
-_Bool pawGlanceNew_psapi( pawGlance_t *glance, pawul_t flags, pawId_t id ) {
+_Bool pawGlanceNew_psapi( pawGlance_t *glance, pawul_t flags, pawId_t *id ) {
 	pawu_t	*IDc;
 	DWORD	*IDs;
 	DWORD in, out;
 	if ( !glance ) return false;
 	memset( glance, 0, sizeof(pawGlance_t) );
 	glance->dwFlags = flags;
-	glance->dwParent = id.dwId;
+	glance->dwParent = id ? id->dwId : 0;
 	glance->uPidIndex = 0;
 	IDs = glance->dwPidBuff = NULL;
 	IDc = &glance->uPidCount;
@@ -159,7 +159,7 @@ _Bool pawGlanceNew_psapi( pawGlance_t *glance, pawul_t flags, pawId_t id ) {
 	} while ( out == in );
 	return true;
 }
-DWORD pawGetParentId_psapi( pawId_t id ) {
+DWORD pawGetParentId_psapi( pawId_t *id ) {
 	DWORD pid = 0;
 	NTSTATUS ntStatus;
 	ULONG_PTR pbi[6] = {0};
@@ -167,22 +167,23 @@ DWORD pawGetParentId_psapi( pawId_t id ) {
 	HANDLE hProc;
 	// No point trying to use a NULL function pointer
 	if ( !l_NtQueryInformationProcess ) return 0;
-	hProc = OpenProcess( PAW_F_PROCESS_QRYINF, FALSE, id.dwId );
-	if ( !hProc ) hProc = OpenProcess( PAW_F_PROCESS_QRYLIM, FALSE, id.dwId );
+	hProc = OpenProcess( PAW_F_PROCESS_QRYINF, FALSE, id ? id->dwId : 0 );
+	if ( !hProc )
+		hProc = OpenProcess( PAW_F_PROCESS_QRYLIM, FALSE, id ? id->dwId : 0 );
 	// If still can't then treat it as a child of system's main process
 	if ( !hProc ) return 0;
-	ntStatus = NtQueryInformationProcess(
+	ntStatus = l_NtQueryInformationProcess(
 		hProc, 0, pbi,
 		sizeof( PROCESS_BASIC_INFORMATION ), &ulRetLen );
 	if  ( !ntStatus ) pid = pbi[5];
 	CloseHandle( hProc );
 	return pid;
 }
-pawMemStat_t pawMemoryStats_psapi( pawId_t id ) {
+pawMemStat_t pawMemoryStats_psapi( pawId_t *id ) {
 	pawMemStat_t ms = {0};
 	PERFORMANCE_INFORMATION pi;
-	HANDLE hProc = OpenProcess( PAW_F_PROCESS_QRYINF, FALSE, id.dwId );
-	if ( !hProc ) hProc = OpenProcess( PAW_F_PROCESS_QRYLIM, FALSE, id.dwId );
+	HANDLE hProc = OpenProcess( PAW_F_PROCESS_QRYINF, FALSE, id->dwId );
+	if ( !hProc ) hProc = OpenProcess( PAW_F_PROCESS_QRYLIM, FALSE, id->dwId );
 	// If still can't then treat it as a child of system's main process
 	if ( !hProc ) return ms;
 	l_GetPerformanceInfo =
@@ -199,10 +200,12 @@ pawMemStat_t pawMemoryStats_psapi( pawId_t id ) {
 }
 _Bool pawGlance1stProcess_psapi( pawGlance_t *glance ) {
 	DWORD i = 0;
+	pawId_t id;
 	if ( !glance ) return false;
 	if ( glance->dwParent != 0 ) {
 		for ( ; i < glance->uPidCount; ++i ) {
-			pawGetParentId_psapi( (pawId_t){glance->dwPidBuff[i]} );
+			id.dwId = glance->dwPidBuff[i];
+			pawGetParentId_psapi( &id );
 		}
 		if ( i == glance->uPidCount ) return false;
 	}
@@ -211,11 +214,14 @@ _Bool pawGlance1stProcess_psapi( pawGlance_t *glance ) {
 }
 _Bool pawGlanceNxtProcess_psapi( pawGlance_t *glance ) {
 	DWORD i;
+	pawId_t id;
 	if ( !glance ) return false;
 	i = glance->uPidIndex + 1;
 	if ( glance->dwParent != 0 ) {
 		for ( ; i < glance->uPidCount; ++i ) {
-			pawGetParentId_psapi( (pawId_t){glance->dwPidBuff[i]} );
+			id.dwId = glance->dwPidBuff[i];
+			if ( pawGetParentId_psapi( &id ) == glance->dwParent )
+				return true;
 		}
 		if ( i == glance->uPidCount ) return false;
 	}
@@ -311,7 +317,7 @@ pawAPI_t* pawSetup( void ) {
 	// Try getting the toolhelp32 API first
 	return paw_tlhelp32 ? paw_tlhelp32 : paw_psapi;
 }
-_Bool pawClrUp( pawAPI_t* paw ) {
+_Bool pawClrup( pawAPI_t* paw ) {
 	if ( l_paw_hmT && !FreeLibrary( l_paw_hmT ) ) return false;
 	l_paw_hmT = NULL;
 	if ( l_paw_hmP && !FreeLibrary( l_paw_hmP ) ) return false;

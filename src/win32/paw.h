@@ -5,32 +5,7 @@ win32/paw.h: paw.h
 #	else
 #		include <paw.h>
 #		include <Winternl.h>
-#		include <windows.h>
-#		include <psapi.h>
-#		include <tlhelp32.h>
 
-struct _pawId {
-	DWORD dwId;
-};
-struct _pawGlance {
-	HANDLE	hGlance;
-	PROCESSENTRY32	pe32Entry;
-	//PROCESSENTRY32W	pe32wEntry;
-	MODULEENTRY32	me32Entry;
-	//MODULEENTRY32W	me32wEntry;
-	DWORD	dwFlags;
-	DWORD	dwParent;
-	pawu_t	uPidCount;
-	pawu_t	uPidIndex;
-	DWORD *	dwPidBuff;
-	pawu_t	uLidCount;
-	pawu_t	uLidIndex;
-	DWORD *	dwLidBuff;
-};
-
-struct _pawProcess { HANDLE hProcess; };
-struct _pawLibrary { HMODULE hLibrary; };
-struct _pawSupport { HANDLE hSupport; };
 
 typedef HANDLE (WINAPI *CreateToolhelp32Snapshot_t)(
 	DWORD flags, DWORD id );

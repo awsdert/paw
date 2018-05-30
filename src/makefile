@@ -11,11 +11,13 @@ EXE_SFX:=$(if $(IS_MSWIN),.exe,)
 APP_SFX:=$(SYS32)$(EXE_SFX)
 
 PAW_INC_DIR:=$(TOP)include
+PAW_INC_SYS:=$(PAW_INC_DIR)/$(SYS)
 PAW_SRC_DIR:=$(TOP)src
+PAW_SRC_SYS:=$(PAW_SRC_DIR)/$(SYS)
 
-PAW_SRC:=$(PAW_SRC_DIR)/$(SYS)/paw.c $(PAW_SRC_DIR)/$(SYS)/shared.c
+PAW_SRC:=$(PAW_SRC_SYS)/paw.c $(PAW_SRC_SYS)/shared.c
 PAW_CPP:=
-PAW_INC:=$(PAW_SRC_DIR)/$(SYS)/paw.h $(PAW_INC_DIR)/paw.h
+PAW_INC:=$(PAW_SRC_SYS)/paw.h $(PAW_INC_DIR)/paw.h
 PAW_OBJ:=$(PAW_SRC:%.c=%.c.o) $(PAW_CPP:%.cpp=%.cpp.o)
 PAW_MAK:=$(PAW_INC:%.h=%.h.mak) $(PAW_SRC:%.c=%.c.mak)
 
@@ -23,8 +25,8 @@ VPATHS:="$(PAW_SRC_DIR)";"$(PAW_INC_DIR)"
 
 CC:=gcc
 IFLAGS:=-I"$(PAW_INC_DIR)" -I"$(PAW_SRC_DIR)"
-LFLAGS:=-shared -L"$(PAW_INC_DIR)" -L"$(PAW_SRC_DIR)" -l
-CFLAGS:=$(IFLAGS)
+LFLAGS:=-L"$(PAW_INC_DIR)" -L"$(PAW_SRC_DIR)" -L"$(TOP)"
+CFLAGS:=$(IFLAGS) -Wall
 MFLAGS:=$(IFLAGS) -E -DDEF_DEP
 
 # Compile everything
@@ -32,19 +34,20 @@ MFLAGS:=$(IFLAGS) -E -DDEF_DEP
 all: test
 	@echo all
 
-include $(PAW_MAK)
+include $(PAW_MAK) $(PAW_SRC_SYS)/test.c.mak
 
 # Compile paw into a library file
 
 shared: $(PAW_OBJ)
 	@echo shared
-	$(CC) $(LFLAGS) $(patsubst %,"%",$(PAW_OBJ)) -o $(LIB_PFX)paw$(LIB_SFX)
+	$(CC) -shared -mwindows $(LFLAGS) $(patsubst %,"%",$(PAW_OBJ)) -o $(TOP)$(LIB_PFX)paw$(LIB_SFX)
 
 # Compile a test app
 
-test: shared $(SYS)/test.c
+test: shared $(PAW_SRC_SYS)/test.c.o
 	@echo test
-	$(CC) $(IFLAGS) -text$(APP_SFX)
+	$(CC) $(LFLAGS) $(PAW_SRC_SYS)/text.c.o -o $(TOP)test$(APP_SFX) -l $(LIB_PFX)paw$(LIB_SFX)
+	$(TOP)test$(APP_SFX)
 
 # Compile *.mak options
 

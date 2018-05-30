@@ -38,6 +38,56 @@ typedef struct _pawMemStat
 	size_t CommitMem; // PrivateUsage
 } pawMemStat_t;
 
+#		ifdef _WIN32
+#			include <windows.h>
+#			include <tlhelp32.h>
+#			include <psapi.h>
+struct _pawId {
+	DWORD dwId;
+};
+struct _pawGlance {
+	HANDLE	hGlance;
+	PROCESSENTRY32	pe32Entry;
+	//PROCESSENTRY32W	pe32wEntry;
+	MODULEENTRY32	me32Entry;
+	//MODULEENTRY32W	me32wEntry;
+	DWORD	dwFlags;
+	DWORD	dwParent;
+	pawu_t	uPidCount;
+	pawu_t	uPidIndex;
+	DWORD *	dwPidBuff;
+	pawu_t	uLidCount;
+	pawu_t	uLidIndex;
+	DWORD *	dwLidBuff;
+};
+
+struct _pawProcess { HANDLE hProcess; };
+struct _pawLibrary { HMODULE hLibrary; };
+struct _pawSupport { HANDLE hSupport; };
+#		else
+#			include <dirent.h>
+struct _pawId {
+	int iId;
+};
+struct _pawGlance {
+	DIR	*	pGlance;
+	struct dirent
+			deEntry;
+	pawul_t	ulFlags;
+	int		iParent;
+	pawu_t	uPidCount;
+	pawu_t	uPidIndex;
+	int *	dwPidBuff;
+	pawu_t	uLidCount;
+	pawu_t	uLidIndex;
+	int *	dwLidBuff;
+};
+
+struct _pawProcess { int iProcess; };
+struct _pawLibrary { int iLibrary; };
+struct _pawSupport { int iSupport; };
+#		endif
+
 #		ifdef UNICODE
 #			define pawProcess			pawProcessW
 #			define pawLibrary			pawLibraryW
@@ -124,11 +174,11 @@ typedef struct pawAPI {
 	// Hacks should rely on these for consistency across DLL versions
 	pawul_t ulVersion;
 	pawul_t ulBaseAPI;
-	_Bool (*pawGlanceNew)( pawGlance_t *glance, pawul_t flags, pawId_t id );
+	_Bool (*pawGlanceNew)( pawGlance_t *glance, pawul_t flags, pawId_t *id );
 	pawu_t (*pawGlancePIDs)( pawId_t *PIDs, pawu_t PIDc );
 	pawu_t (*pawGlanceMIDs)( pawId_t *MIDs, pawu_t MIDc );
 	pawu_t (*pawGlanceTIDs)( pawId_t *TIDs, pawu_t TIDc );
-	pawMemStat_t (*pawMemoryStats)( pawId_t id );
+	pawMemStat_t (*pawMemoryStats)( pawId_t *id );
 	_Bool (*pawProcessExeA)( pawProcess_t *process, char *dstA, pawu_t uCap );
 	_Bool (*pawProcessExeW)( pawProcess_t *process, char *dstW, pawu_t uCap );
 	_Bool (*pawGlance1stProcess)( pawGlance_t *glance );
@@ -137,7 +187,8 @@ typedef struct pawAPI {
 	_Bool (*pawGlanceNxtLibrary)( pawGlance_t *glance );
 	_Bool (*pawGlanceDel)( pawGlance_t *glance );
 	_Bool (*pawGripProcess)(
-		pawProcess_t *process, size_t wantAccess, size_t bShareHandles, int id );
+		pawProcess_t *process, size_t wantAccess,
+		size_t bShareHandles, pawId_t *id );
 	_Bool (*pawFreeProcess)( pawProcess_t *process );
 	_Bool (*pawGrabLibrary)(
 		pawProcess_t *process, pawLibrary_t *library, char *path );
@@ -147,6 +198,6 @@ typedef struct pawAPI {
 // Attempt to wrap system API at app startup
 pawAPI_t* pawSetup( void );
 // Attempt to clean up before app shutdown
-_Bool pawClrUp( pawAPI_t *paw );
+_Bool pawClrup( pawAPI_t *paw );
 #	endif
 #endif
