@@ -18,6 +18,7 @@ typedef unsigned long pawul_t;
 typedef signed long long pawll_t;
 typedef unsigned long long pawull_t;
 typedef struct _pawId pawId_t;
+typedef struct _pawIDs pawIDs_t;
 typedef struct _pawGlance pawGlance_t;
 typedef struct _pawProcess pawProcess_t;
 typedef struct _pawLibrary pawLibrary_t;
@@ -26,16 +27,14 @@ typedef struct _pawSupport pawSupport_t;
 // DO NOT CHANGE, must be consistent across DLLs
 typedef struct _pawMemStat
 {
-	size_t PgMishaps; // PageFaultCount
-	size_t MemoryCap; // PeakWorkingSetSize
-	size_t MemoryMem; // WorkingSetSize
-	size_t PgPoolCap; // QuotaPeakPagedPoolUsage
-	size_t PgPoolMem; // QuotaPagedPoolUsage
-	size_t NoPgPlCap; // QuotaPeakNonPagedPoolUsage
-	size_t NoPgPlMem; // QuotaNonPagedPoolUsage
-	size_t PgFileMem; // PagefileUsage
-	size_t PgFileCap; // PeakPagefileUsage
-	size_t CommitMem; // PrivateUsage
+	pawul_t	 ulMemPercent; // dwMemoryLoad
+	pawull_t ullTotalPhys; // ullTotalPhys
+	pawull_t ullAvailPhys; // ullAvailPhys
+	pawull_t ullTotalPage; // ullTotalPageFile
+	pawull_t ullAvailPage; // ullAvailPageFile
+	pawull_t ullTotalVmem; // ullTotalVirtual
+	pawull_t ullAvailVmem; // ullAvailVirtual
+	pawull_t ullAvailVext; // ullAvailExtendedVirtual
 } pawMemStat_t;
 
 #		ifdef _WIN32
@@ -45,42 +44,52 @@ typedef struct _pawMemStat
 struct _pawId {
 	DWORD dwId;
 };
+struct _pawIDs {
+	pawu_t	uPos;
+	pawu_t	uCap;
+	pawu_t	uSet;
+	DWORD	cbCap;
+	DWORD	cbSet;
+	DWORD *	dwVec;
+};
 struct _pawGlance {
+	pawul_t	ulFlags;
+	pawId_t IdParent;
+	pawIDs_t processIDs;
+	pawIDs_t libraryIDs;
+	pawIDs_t supportIDs;
 	HANDLE	hGlance;
 	PROCESSENTRY32	pe32Entry;
 	//PROCESSENTRY32W	pe32wEntry;
 	MODULEENTRY32	me32Entry;
 	//MODULEENTRY32W	me32wEntry;
-	DWORD	dwFlags;
-	DWORD	dwParent;
-	pawu_t	uPidCount;
-	pawu_t	uPidIndex;
-	DWORD *	dwPidBuff;
-	pawu_t	uLidCount;
-	pawu_t	uLidIndex;
-	DWORD *	dwLidBuff;
 };
 
 struct _pawProcess { HANDLE hProcess; };
-struct _pawLibrary { HMODULE hLibrary; };
+struct _pawLibrary { HMODULE hmLibrary; };
 struct _pawSupport { HANDLE hSupport; };
 #		else
 #			include <dirent.h>
 struct _pawId {
 	int iId;
 };
+struct _pawIDs {
+	pawu_t	uPos;
+	pawu_t	uCap;
+	pawu_t	uSet;
+	size_t	cbCap;
+	size_t	cbSet;
+	int *	iVec;
+};
 struct _pawGlance {
+	pawul_t	ulFlags;
+	pawId_t IdParent;
+	pawIDs_t processIDs;
+	pawIDs_t libraryIDs;
+	pawIDs_t supportIDs;
 	DIR	*	pGlance;
 	struct dirent
 			deEntry;
-	pawul_t	ulFlags;
-	int		iParent;
-	pawu_t	uPidCount;
-	pawu_t	uPidIndex;
-	int *	dwPidBuff;
-	pawu_t	uLidCount;
-	pawu_t	uLidIndex;
-	int *	dwLidBuff;
 };
 
 struct _pawProcess { int iProcess; };
@@ -170,34 +179,61 @@ enum {
 	PAW_E_BASEAPI_COUNT
 };
 
-typedef struct pawAPI {
+typedef struct _pawAPI {
 	// Hacks should rely on these for consistency across DLL versions
 	pawul_t ulVersion;
 	pawul_t ulBaseAPI;
-	_Bool (*pawGlanceNew)( pawGlance_t *glance, pawul_t flags, pawId_t *id );
-	pawu_t (*pawGlancePIDs)( pawId_t *PIDs, pawu_t PIDc );
-	pawu_t (*pawGlanceMIDs)( pawId_t *MIDs, pawu_t MIDc );
-	pawu_t (*pawGlanceTIDs)( pawId_t *TIDs, pawu_t TIDc );
-	pawMemStat_t (*pawMemoryStats)( pawId_t *id );
-	_Bool (*pawProcessExeA)( pawProcess_t *process, char *dstA, pawu_t uCap );
-	_Bool (*pawProcessExeW)( pawProcess_t *process, char *dstW, pawu_t uCap );
-	_Bool (*pawGlance1stProcess)( pawGlance_t *glance );
-	_Bool (*pawGlanceNxtProcess)( pawGlance_t *glance );
-	_Bool (*pawGlance1stLibrary)( pawGlance_t *glance );
-	_Bool (*pawGlanceNxtLibrary)( pawGlance_t *glance );
-	_Bool (*pawGlanceDel)( pawGlance_t *glance );
-	_Bool (*pawGripProcess)(
-		pawProcess_t *process, size_t wantAccess,
-		size_t bShareHandles, pawId_t *id );
-	_Bool (*pawFreeProcess)( pawProcess_t *process );
-	_Bool (*pawGrabLibrary)(
+	_Bool (*glanceNew)( pawGlance_t *glance, pawul_t flags, pawId_t *id );
+	_Bool (*glanceProcessIDs)( pawIDs_t *IDs );
+	_Bool (*glanceLibraryIDs)( pawIDs_t *IDs );
+	_Bool (*glanceSupportIDs)( pawIDs_t *IDs );
+	_Bool (*processExeA)( pawProcess_t *process, char *strExe, pawu_t uCap );
+	_Bool (*processExeW)( pawProcess_t *process, char *wcsExe, pawu_t uCap );
+	_Bool (*recentMemStats)( pawProcess_t *process, pawMemStat_t *memstat );
+	_Bool (*glanceMemStats)( pawGlance_t *glance, pawMemStat_t *memstat );
+	_Bool (*glance1stProcess)( pawGlance_t *glance, pawId_t *id );
+	_Bool (*glanceNxtProcess)( pawGlance_t *glance, pawId_t *id );
+	_Bool (*glance1stLibrary)( pawGlance_t *glance, pawId_t *id );
+	_Bool (*glanceNxtLibrary)( pawGlance_t *glance, pawId_t *id );
+	_Bool (*glanceDel)( pawGlance_t *glance );
+	_Bool (*gripProcess)( pawProcess_t *process,
+		pawul_t ulWantAccess, _Bool bShareHandles, pawId_t *id );
+	_Bool (*rdProcess)( pawProcess_t *process,
+		void *pvAddr, void *pvBuff, size_t cb2Rd, size_t *cbGot );
+	_Bool (*wrProcess)( pawProcess_t *process,
+		void *pvAddr, void *pvBuff, size_t cb2Wr, size_t *cbDid );
+	_Bool (*freeProcess)( pawProcess_t *process );
+	_Bool (*grabLibrary)(
 		pawProcess_t *process, pawLibrary_t *library, char *path );
-	_Bool (*pawFreeLibrary)( pawProcess_t process, pawLibrary_t library );
+	_Bool (*freeLibrary)( pawProcess_t process, pawLibrary_t library );
 } pawAPI_t;
 
-// Attempt to wrap system API at app startup
-pawAPI_t* pawSetup( void );
-// Attempt to clean up before app shutdown
-_Bool pawClrup( pawAPI_t *paw );
+/* Attempt to wrap system API at app startup,
+paw: pass NULL to cleanup APIs
+ulBaseAPI: pass invalid value for default wrapper
+Sudo Example:
+main(...)
+pawAPI_t paw = {0};
+if ( !pawAPI( &paw, 0 ) )
+	return -1;
+switch ( paw.ulBaseAPI ) {
+	case #: exec("app_?32.exe" ); break;
+	default: puts("unsupported, exiting...") goto done;
+}
+...
+done:
+while ( !pawAPI( NULL, 0 ) );
+return 0;
+*/
+void pawDelIDs( pawIDs_t *IDs );
+_Bool pawAPI( pawAPI_t* paw, pawul_t ulBaseAPI );
+/* For functions not accessed via paw */
+void* pvFuncByStr( pawul_t ulBaseAPI, char const * const strFunc );
+void* pvFuncByWcs( pawul_t ulBaseAPI, wchar_t const * const wcsFunc );
+#		ifdef _UNICODE
+#			define pvFuncByTcs pvFuncByWcs
+#		else
+#			define pvFuncByTcs pvFuncByStr
+#		endif
 #	endif
 #endif

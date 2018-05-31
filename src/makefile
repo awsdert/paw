@@ -40,13 +40,13 @@ include $(PAW_MAK) $(PAW_SRC_SYS)/test.c.mak
 
 shared: $(PAW_OBJ)
 	@echo shared
-	$(CC) -shared -mwindows $(LFLAGS) $(patsubst %,"%",$(PAW_OBJ)) -o $(TOP)$(LIB_PFX)paw$(LIB_SFX)
+	$(CC) -shared -mwindows $(LFLAGS) $(patsubst %,"%",$(PAW_OBJ)) -o "$(TOP)$(LIB_PFX)paw$(LIB_SFX)"
 
 # Compile a test app
 
 test: shared $(PAW_SRC_SYS)/test.c.o
 	@echo test
-	$(CC) $(LFLAGS) $(PAW_SRC_SYS)/text.c.o -o $(TOP)test$(APP_SFX) -l $(LIB_PFX)paw$(LIB_SFX)
+	$(CC) $(LFLAGS) -l $(LIB_PFX)paw$(LIB_SFX) "$(PAW_SRC_SYS)/text.c.o" -o "$(TOP)test$(APP_SFX)"
 	$(TOP)test$(APP_SFX)
 
 # Compile *.mak options

@@ -5,10 +5,26 @@ win32/paw.c: win32/paw.h
 
 static pawAPI_t l_pawAPI[2] = {{0}};
 
-static HMODULE l_paw_hmK = NULL; // Kernel32
-static HMODULE l_paw_hmN = NULL; // Ntdll.dll
-static HMODULE l_paw_hmT = NULL; // ToolHelp32
-static HMODULE l_paw_hmP = NULL; // PSAPI
+typedef enum _PAW_E_LIBRARY {
+	PAW_E_LIBRARY_KERNEL32 = 0,
+	PAW_E_LIBRARY_NTDLL,
+	PAW_E_LIBRARY_TOOLHELP32,
+	PAW_E_LIBRARY_PSAPI,
+	PAW_E_LIBRARY_COUNT
+} PAW_E_LIBRARY_t;
+static TCHAR *l_libraries[PAW_E_LIBRARY_COUNT] = {
+	TEXT("Kernel32.dll"),
+	TEXT("Ntdll.dll"),
+	TEXT("ToolHelp32.dll"),
+	TEXT("Psapi.dll")
+};
+static pawLibrary_t l_pawLibrary[PAW_E_LIBRARY_COUNT] = {{NULL}};
+HMODULE pawGetLibrary( PAW_E_LIBRARY_t eLib ) {
+	pawLibrary_t *lib = &l_pawLibrary[eLib];
+	if ( !lib->hmLibrary )
+		lib->hmLibrary = LoadLibrary( l_libraries[eLib] );
+	return lib->hmLibrary;
+}
 
 // 1st API choice
 static CreateToolhelp32Snapshot_t l_CreateToolhelp32Snapshot = NULL;
@@ -23,12 +39,16 @@ static Module32NextW_t	 l_ModuleNxtW = NULL;
 
 // 2nd API choice
 static EnumProcesses_t l_EnumProcesses = NULL;
-static GetPerformanceInfo_t l_GetPerformanceInfo = NULL;
 static NtQueryInformationProcess_t	l_NtQueryInformationProcess = NULL;
 static QueryFullProcessImageNameA_t  l_QueryFullProcessImageNameA = NULL;
 static QueryFullProcessImageNameW_t  l_QueryFullProcessImageNameW = NULL;
 
-// Credit to https://www.codeguru.com/cpp/w-p/win32/article.php/c1437/Retrieving-the-parent-of-a-process-WinNT.htm
+void pawDelIDs( pawIDs_t *IDs ) {
+	if ( !IDs ) return;
+	if ( IDs->dwVec )
+		free( IDs->dwVec );
+	(void)memset( IDs, 0, sizeof( pawIDs_t ) );
+}
 
 // 1st API Wrapper
 _Bool pawGlanceNew_tlhelp32( pawGlance_t *glance, pawul_t flags, pawId_t *id ) {
@@ -37,36 +57,84 @@ _Bool pawGlanceNew_tlhelp32( pawGlance_t *glance, pawul_t flags, pawId_t *id ) {
 	glance->hGlance = l_CreateToolhelp32Snapshot( flags, id->dwId );
 	return glance->hGlance ? true : false;
 }
-_Bool pawGlance1stProcess_tlhelp32( pawGlance_t *glance ) {
+_Bool pawRecentMemoryStats_tlhelp32(
+	pawProcess_t *process, pawMemStat_t *memstat ) {
+	if ( !memstat ) return false;
+	MEMORYSTATUSEX msx = {0};
+	msx.dwLength = sizeof(MEMORYSTATUSEX);
+	if ( !process || !process->hProcess ) {
+		zero_memstat_tlhelp32:
+		memset( memstat, 0, sizeof( pawMemStat_t ) );
+		return true;
+	}
+	GlobalMemoryStatusEx_t r_GlobalMemoryStatusEx = (GlobalMemoryStatusEx_t)
+		GetProcAddress( process->hProcess, "GlobalMemoryStatusEx" );
+	if ( !r_GlobalMemoryStatusEx )
+		goto zero_memstat_tlhelp32;
+	r_GlobalMemoryStatusEx( &msx );
+	memstat->ulMemPercent = msx.dwMemoryLoad;
+	memstat->ullTotalPhys = msx.ullTotalPhys;
+	memstat->ullAvailPhys = msx.ullAvailPhys;
+	memstat->ullTotalPage = msx.ullTotalPageFile;
+	memstat->ullAvailPage = msx.ullAvailPageFile;
+	memstat->ullTotalVmem = msx.ullTotalVirtual;
+	memstat->ullAvailVmem = msx.ullAvailVirtual;
+	memstat->ullAvailVext = msx.ullAvailExtendedVirtual;
+	return true;
+}
+_Bool pawGlanceMemoryStats_tlhelp32(
+	pawGlance_t *glance, pawMemStat_t *memstat ) {
+	if ( !memstat ) return false;
+	if ( !glance ) {
+		zero_memstat_tlhelp32_glance:
+		memset( memstat, 0, sizeof( pawMemStat_t ) );
+		return true;
+	}
+	pawProcess_t process = { OpenProcess(
+		PAW_F_PROCESS_KNOWNR, 0, glance->pe32Entry.th32ProcessID ) };
+	if ( !process.hProcess )
+		goto zero_memstat_tlhelp32_glance;
+	_Bool result = pawRecentMemoryStats_tlhelp32( &process, memstat );
+	CloseHandle( process.hProcess );
+	return result;
+}
+_Bool pawGlance1stProcess_tlhelp32( pawGlance_t *glance, pawId_t *id ) {
+	pawIDs_t *IDs;
 	if ( !glance ||
 		!l_Process1stA( glance->hGlance, &(glance->pe32Entry) ) )
 		return false;
+	if ( id ) id->dwId = glance->pe32Entry.th32ProcessID;
 	// In case someone tries to use the PSAPI wrapper
-	glance->dwPidBuff = &(glance->pe32Entry.th32ProcessID);
-	glance->uPidIndex = 0;
-	glance->uPidCount = 1;
+	IDs = &glance->processIDs;
+	IDs->dwVec = &(glance->pe32Entry.th32ProcessID);
+	IDs->cbSet = sizeof(DWORD);
+	IDs->cbCap = sizeof(DWORD);
 	return true;
 }
-_Bool pawGlanceNxtProcess_tlhelp32( pawGlance_t *glance ) {
+_Bool pawGlanceNxtProcess_tlhelp32( pawGlance_t *glance, pawId_t *id ) {
 	if ( !glance ||
 		!l_ProcessNxtA( glance->hGlance, &(glance->pe32Entry) ) )
 		return false;
+	if ( id ) id->dwId = glance->pe32Entry.th32ProcessID;
 	return true;
 }
-_Bool pawGlance1stLibrary_tlhelp32( pawGlance_t *glance ) {
+_Bool pawGlance1stLibrary_tlhelp32( pawGlance_t *glance, pawId_t *id ) {
 	if ( !glance ||
 		!l_Module1stA( glance->hGlance, &(glance->me32Entry) ) )
 		return false;
+	if ( id ) id->dwId = glance->pe32Entry.th32ModuleID;
 	// In case someone tries to use the PSAPI wrapper
-	glance->dwLidBuff = &(glance->me32Entry.th32ModuleID);
-	glance->uLidIndex = 0;
-	glance->uLidCount = 1;
+	pawIDs_t *IDs = &glance->libraryIDs;
+	IDs->dwVec = &(glance->me32Entry.th32ModuleID);
+	IDs->cbSet = sizeof(DWORD);
+	IDs->cbCap = sizeof(DWORD);
 	return true;
 }
-_Bool pawGlanceNxtLibrary_tlhelp32( pawGlance_t *glance ) {
+_Bool pawGlanceNxtLibrary_tlhelp32( pawGlance_t *glance, pawId_t *id ) {
 	if ( !glance ||
 		!l_Module1stA( glance->hGlance, &(glance->me32Entry) ) )
 		return false;
+	if ( id ) id->dwId = glance->pe32Entry.th32ModuleID;
 	return true;
 }
 _Bool pawGlanceDel_tlhelp32( pawGlance_t *glance ) {
@@ -95,23 +163,36 @@ char const * const pawFunc_tlhelp32( pawu_t index ) {
 		return NULL;
 	return &(pawTLHELP32_names[index][pawTLHELP32_from]);
 }
-pawAPI_t* pawSetup_tlhelp32() {
-	HMODULE hmT = NULL, hm = NULL;
-	if ( !l_paw_hmK )
-		l_paw_hmK = GetModuleHandle(TEXT("Kernel32.dll"));
-	hm = l_paw_hmK;
+_Bool pawAPI_tlhelp32( pawAPI_t* paw ) {
+	HMODULE hm = NULL, hmT = NULL,
+		hmK = pawGetLibrary(PAW_E_LIBRARY_KERNEL32);
+	if ( !paw || !hmK || paw->ulBaseAPI == PAW_E_BASEAPI_COUNT )
+		return false;
+	paw->ulBaseAPI = PAW_E_BASEAPI_K32_TLH32;
+	paw->glanceNew = pawGlanceNew_tlhelp32;
+	paw->recentMemStats = pawRecentMemoryStats_tlhelp32;
+	paw->glanceMemStats = pawGlanceMemoryStats_tlhelp32;
+	paw->glance1stProcess = pawGlance1stProcess_tlhelp32;
+	paw->glanceNxtProcess = pawGlanceNxtProcess_tlhelp32;
+	paw->glance1stLibrary = pawGlance1stLibrary_tlhelp32;
+	paw->glanceNxtLibrary = pawGlanceNxtLibrary_tlhelp32;
+	paw->glanceDel = pawGlanceDel_tlhelp32;
+	hm = hmK;
 	find_tlhelp32:
 	l_CreateToolhelp32Snapshot = (CreateToolhelp32Snapshot_t)
 	  GetProcAddress( hm, pawFunc_tlhelp32(0) );
 	if ( !l_CreateToolhelp32Snapshot ) {
-		if ( hmT ) return NULL;
-		hmT = l_paw_hmT ? l_paw_hmT : LoadLibrary( TEXT("ToolHelp32.dll") );
-		if ( !hmT ) return NULL;
+		// Ensure we do not loop more than once
+		if ( hmT ) {
+			paw->ulBaseAPI = PAW_E_BASEAPI_COUNT;
+			return false;
+		}
+		hmT = pawGetLibrary(PAW_E_LIBRARY_TOOLHELP32);
+		if ( !hmT ) return false;
 		hm = hmT;
-		// Ensures we don't reattempt LoadLibrary()
-		l_paw_hmT = hmT;
 		// Ensures we don't include "K32" in our searches
 		pawTLHELP32_from = 3;
+		paw->ulBaseAPI = PAW_E_BASEAPI_TLH32;
 		goto find_tlhelp32;
 	}
 	l_Process1stA = (Process32First_t)
@@ -130,34 +211,38 @@ pawAPI_t* pawSetup_tlhelp32() {
 		GetProcAddress( hm, pawFunc_tlhelp32(7) );
 	l_ModuleNxtW = (Module32NextW_t)
 		GetProcAddress( hm, pawFunc_tlhelp32(8) );
-	l_pawAPI[0].ulBaseAPI =
-		hmT ? PAW_E_BASEAPI_TLH32 : PAW_E_BASEAPI_K32_TLH32;
-	return &(l_pawAPI[0]);
+	return true;
 }
 // 2nd API Wrapper
 _Bool pawGlanceNew_psapi( pawGlance_t *glance, pawul_t flags, pawId_t *id ) {
-	pawu_t	*IDc;
-	DWORD	*IDs;
-	DWORD in, out;
+	pawIDs_t *IDs;
+	DWORD *dwVec;
 	if ( !glance ) return false;
+	IDs = &glance->processIDs;
+	dwVec = IDs->dwVec;
 	memset( glance, 0, sizeof(pawGlance_t) );
-	glance->dwFlags = flags;
-	glance->dwParent = id ? id->dwId : 0;
-	glance->uPidIndex = 0;
-	IDs = glance->dwPidBuff = NULL;
-	IDc = &glance->uPidCount;
-	*IDc = 0;
+	glance->ulFlags = flags;
+	glance->IdParent.dwId = id ? id->dwId : 0;
+	dwVec = IDs->dwVec = NULL;
+	IDs->cbCap = 0;
 	do {
-		in = (*IDc += 1024) * sizeof(in);
-		IDs = realloc( glance->dwPidBuff, in );
-		if ( !IDs ) {
-			if ( glance->dwPidBuff )
-				free( glance->dwPidBuff );
-			return false;
-		}
-		l_EnumProcesses( glance->dwPidBuff = IDs, in, &out );
-	} while ( out == in );
-	return true;
+		IDs->cbCap += (1024 * sizeof(DWORD));
+		dwVec = realloc( IDs->dwVec, IDs->cbCap );
+		if ( !dwVec )
+			goto fail_glancenew_psapi;
+		l_EnumProcesses( IDs->dwVec = dwVec, IDs->cbCap, &IDs->cbSet );
+	} while ( IDs->cbSet == IDs->cbCap );
+	if ( IDs->cbSet ) {
+		IDs->uCap = IDs->cbCap / sizeof(DWORD);
+		IDs->uSet = IDs->cbSet / sizeof(DWORD);
+		IDs->uPos = 0;
+		return true;
+	}
+	fail_glancenew_psapi:
+	if ( IDs->dwVec )
+		free( IDs->dwVec );
+	(void)memset( IDs, 0, sizeof( pawIDs_t ) );
+	return false;
 }
 DWORD pawGetParentId_psapi( pawId_t *id ) {
 	DWORD pid = 0;
@@ -179,68 +264,71 @@ DWORD pawGetParentId_psapi( pawId_t *id ) {
 	CloseHandle( hProc );
 	return pid;
 }
-pawMemStat_t pawMemoryStats_psapi( pawId_t *id ) {
-	pawMemStat_t ms = {0};
-	PERFORMANCE_INFORMATION pi;
-	HANDLE hProc = OpenProcess( PAW_F_PROCESS_QRYINF, FALSE, id->dwId );
-	if ( !hProc ) hProc = OpenProcess( PAW_F_PROCESS_QRYLIM, FALSE, id->dwId );
-	// If still can't then treat it as a child of system's main process
-	if ( !hProc ) return ms;
-	l_GetPerformanceInfo =
-		(GetPerformanceInfo_t)GetProcAddress( hProc, "K32GetPerformanceInfo" );
-	if ( l_GetPerformanceInfo ) goto pawGetPerformanceInfo;
-	l_GetPerformanceInfo =
-		(GetPerformanceInfo_t)GetProcAddress( hProc, "GetPerformanceInfo" );
-	pawGetPerformanceInfo:
-	if ( l_GetPerformanceInfo )
-		l_GetPerformanceInfo( &pi, sizeof(PERFORMANCE_INFORMATION) );
-	CloseHandle( hProc );
-	// TODO: convert pi members to ms members
-	return ms;
-}
-_Bool pawGlance1stProcess_psapi( pawGlance_t *glance ) {
-	DWORD i = 0;
-	pawId_t id;
+_Bool pawGlanceMemoryStats_psapi(
+	pawGlance_t *glance, pawMemStat_t *memstat ) {
+	pawProcess_t process;
 	if ( !glance ) return false;
-	if ( glance->dwParent != 0 ) {
-		for ( ; i < glance->uPidCount; ++i ) {
-			id.dwId = glance->dwPidBuff[i];
-			pawGetParentId_psapi( &id );
+	pawIDs_t *IDs = &glance->processIDs;
+	pawu_t uCap = IDs->cbCap / sizeof(DWORD);
+	if ( IDs->uPos >= uCap ) return false;
+	pawId_t id = { IDs->dwVec[IDs->uPos] };
+	process.hProcess = OpenProcess( PAW_F_PROCESS_KNOWNR, FALSE, id.dwId );
+	if ( !process.hProcess ) return false;
+	_Bool result = pawRecentMemoryStats_tlhelp32( &process, memstat );
+	CloseHandle( process.hProcess );
+	return result;
+}
+_Bool pawGlance1stProcess_psapi( pawGlance_t *glance, pawId_t *id ) {
+	pawu_t i = 0;
+	pawId_t pid;
+	if ( !glance ) return false;
+	pawIDs_t *IDs = &glance->processIDs;
+	if ( glance->IdParent.dwId != 0 ) {
+		for ( ; i < IDs->uSet; ++i ) {
+			pid.dwId = 	IDs->dwVec[i];
+			if ( pawGetParentId_psapi( &pid ) == glance->IdParent.dwId )
+				goto done_1stprocess_psapi;
 		}
-		if ( i == glance->uPidCount ) return false;
+		if ( i == IDs->uSet ) return false;
 	}
-	glance->uPidIndex = i;
+	done_1stprocess_psapi:
+	IDs->uPos = i;
+	if ( id ) id->dwId = IDs->dwVec[i];
 	return true;
 }
-_Bool pawGlanceNxtProcess_psapi( pawGlance_t *glance ) {
-	DWORD i;
-	pawId_t id;
+_Bool pawGlanceNxtProcess_psapi( pawGlance_t *glance, pawId_t *id ) {
+	pawu_t i = 0;
+	pawId_t pid;
 	if ( !glance ) return false;
-	i = glance->uPidIndex + 1;
-	if ( glance->dwParent != 0 ) {
-		for ( ; i < glance->uPidCount; ++i ) {
-			id.dwId = glance->dwPidBuff[i];
-			if ( pawGetParentId_psapi( &id ) == glance->dwParent )
-				return true;
+	pawIDs_t *IDs = &glance->processIDs;
+	i = IDs->uPos;
+	if ( glance->IdParent.dwId != 0 ) {
+		for ( ; i < IDs->uSet; ++i ) {
+			pid.dwId = 	IDs->dwVec[i];
+			if ( pawGetParentId_psapi( &pid ) == glance->IdParent.dwId )
+				goto done_nxtprocess_psapi;
 		}
-		if ( i == glance->uPidCount ) return false;
+		if ( i == IDs->uSet ) return false;
 	}
-	glance->uPidIndex = i;
+	else ++i;
+	done_nxtprocess_psapi:
+	IDs->uPos = i;
+	if ( id ) id->dwId = IDs->dwVec[i];
 	return true;
 }
-_Bool pawGlance1stLibrary_psapi( pawGlance_t *glance ) { return false; }
-_Bool pawGlanceNxtLibrary_psapi( pawGlance_t *glance ) { return false; }
+_Bool pawGlance1stLibrary_psapi( pawGlance_t *glance, pawId_t *id ) {
+	return false; }
+_Bool pawGlanceNxtLibrary_psapi( pawGlance_t *glance, pawId_t *id ) {
+	return false; }
 _Bool pawGlanceDel_psapi( pawGlance_t *glance ) {
-		if ( glance ) {
-			  if ( glance->dwPidBuff )
-			    free( glance->dwPidBuff );
-			  glance->dwPidBuff = NULL;
-			  glance->dwParent = 0;
-			  glance->uPidCount = glance->uPidIndex = 0;
-			  return true;
-		}
-		return false;
+	if ( glance ) {
+		pawDelIDs( &glance->processIDs );
+		pawDelIDs( &glance->libraryIDs );
+		pawDelIDs( &glance->supportIDs );
+		return true;
 	}
+	return false;
+}
 
 pawu_t pawPSAPI_from = 0;
 char *pawPSAPI_names[] = {
@@ -253,77 +341,85 @@ char const * const pawFunc_psapi( pawu_t index ) {
 		return NULL;
 	return &(pawPSAPI_names[index][pawPSAPI_from]);
 }
-pawAPI_t* pawSetup_psapi() {
-	HMODULE hmP = NULL, hm = NULL;
-	if ( !l_paw_hmK )
-		l_paw_hmK = GetModuleHandle(TEXT("Kernel32.dll"));
-	if ( !l_paw_hmN ) {
-		l_paw_hmN = LoadLibrary(TEXT("Ntdll.dll" ));
-		if ( !l_paw_hmN )
-			return NULL;
-	}
-	hm = l_paw_hmK;
+_Bool pawAPI_psapi( pawAPI_t *paw ) {
+	HMODULE hm = NULL, hmP = NULL,
+		hmN = pawGetLibrary(PAW_E_LIBRARY_NTDLL),
+		hmK = pawGetLibrary(PAW_E_LIBRARY_KERNEL32);
+	if ( !paw || !hmK || !hmN || paw->ulBaseAPI == PAW_E_BASEAPI_COUNT )
+		return false;
+	paw->glanceNew = pawGlanceNew_psapi;
+	// This one uses kernel32.dll function so should be no issue
+	paw->recentMemStats = pawRecentMemoryStats_tlhelp32;
+	// ToolHelp32 version relies on pe32Entry which we don't use in psapi
+	paw->glanceMemStats = pawGlanceMemoryStats_psapi;
+	paw->glance1stProcess = pawGlance1stProcess_psapi;
+	paw->glanceNxtProcess = pawGlanceNxtProcess_psapi;
+	paw->glance1stLibrary = pawGlance1stLibrary_psapi;
+	paw->glanceNxtLibrary = pawGlanceNxtLibrary_psapi;
+	paw->glanceDel = pawGlanceDel_psapi;
+	hm = hmK;
 	l_NtQueryInformationProcess = (NtQueryInformationProcess_t)
-		GetProcAddress( l_paw_hmN, "NtQueryInformationProcess" );
+		GetProcAddress( hmN, "NtQueryInformationProcess" );
 	if ( !l_NtQueryInformationProcess ) {
 		// Try an alternative version
 		l_NtQueryInformationProcess = (NtQueryInformationProcess_t)
-			GetProcAddress( l_paw_hmN, "ZwQueryInformationProcess" );
+			GetProcAddress( hmN, "ZwQueryInformationProcess" );
 	}
 	find_psapi:
 	l_EnumProcesses = (EnumProcesses_t)
 		GetProcAddress( hm, pawFunc_psapi(0) );
 	if (!l_EnumProcesses) {
-		if ( hmP ) return NULL;
-		hmP = l_paw_hmP ? l_paw_hmP : LoadLibrary(TEXT("Psapi.dll"));
+		// Ensure we do not loop more than once
+		if ( hmP ) {
+			paw->ulBaseAPI = PAW_E_BASEAPI_COUNT;
+			return false;
+		}
+		hmP = pawGetLibrary( PAW_E_LIBRARY_PSAPI );
 		if ( !hmP ) return NULL;
 		hm = hmP;
-		// Ensures we don't reattempt LoadLibrary()
-		l_paw_hmP = hmP;
-		// Ensures we don't use "K32" in our search
 		pawPSAPI_from = 3;
+		paw->ulBaseAPI = PAW_E_BASEAPI_PSAPI;
 		goto find_psapi;
 	}
 	l_QueryFullProcessImageNameA =
 		(QueryFullProcessImageNameA_t)GetProcAddress( hm, pawFunc_psapi(1) );
 	l_QueryFullProcessImageNameW =
 		(QueryFullProcessImageNameW_t)GetProcAddress( hm, pawFunc_psapi(2) );
-	l_pawAPI[1].ulBaseAPI =
-		hmP ? PAW_E_BASEAPI_PSAPI : PAW_E_BASEAPI_K32_PSAPI;
-	return &(l_pawAPI[1]);
-	// TODO: Identify functions needed to replicate Process32First etc
-	//return &(l_pawAPI[1]);
+	return true;
 }
 // For main()
-pawAPI_t* pawSetup( void ) {
+_Bool pawSetup( pawAPI_t *paw, pawul_t ulBaseAPI ) {
 	// Ensure both APIs can be accessed internally
-	pawAPI_t *paw_psapi = pawSetup_psapi();
-	pawAPI_t *paw_tlhelp32 = pawSetup_tlhelp32();
+	_Bool bPsapi = pawAPI_psapi( &l_pawAPI[0] );
+	_Bool bTlhelp32 = pawAPI_tlhelp32( &l_pawAPI[1] );
 	// Make sure both APIs have their wrapper functions set
-	l_pawAPI[0].pawGlanceNew = pawGlanceNew_tlhelp32;
-	l_pawAPI[0].pawMemoryStats = pawMemoryStats_psapi;
-	l_pawAPI[0].pawGlance1stProcess = pawGlance1stProcess_tlhelp32;
-	l_pawAPI[0].pawGlanceNxtProcess = pawGlanceNxtProcess_tlhelp32;
-	l_pawAPI[0].pawGlance1stLibrary = pawGlance1stLibrary_tlhelp32;
-	l_pawAPI[0].pawGlanceNxtLibrary = pawGlanceNxtLibrary_tlhelp32;
-	l_pawAPI[0].pawGlanceDel = pawGlanceDel_tlhelp32;
-	l_pawAPI[1].pawGlanceNew = pawGlanceNew_psapi;
-	l_pawAPI[1].pawMemoryStats = pawMemoryStats_psapi;
-	l_pawAPI[1].pawGlance1stProcess = pawGlance1stProcess_psapi;
-	l_pawAPI[1].pawGlanceNxtProcess = pawGlanceNxtProcess_psapi;
-	l_pawAPI[1].pawGlance1stLibrary = pawGlance1stLibrary_psapi;
-	l_pawAPI[1].pawGlanceNxtLibrary = pawGlanceNxtLibrary_psapi;
-	l_pawAPI[1].pawGlanceDel = pawGlanceDel_psapi;
-	// Try getting the toolhelp32 API first
-	return paw_tlhelp32 ? paw_tlhelp32 : paw_psapi;
+	switch ( ulBaseAPI ) {
+		default:
+		case PAW_E_BASEAPI_K32_TLH32:
+		case PAW_E_BASEAPI_TLH32:
+			if ( bTlhelp32 ) {
+				*paw = l_pawAPI[0];
+				return true;
+			}
+		case PAW_E_BASEAPI_K32_PSAPI:
+		case PAW_E_BASEAPI_PSAPI:
+			if ( bPsapi ) {
+				*paw = l_pawAPI[1];
+				return true;
+			}
+	}
+	(void)memset( paw, 0, sizeof( pawAPI_t ) );
+	return false;
 }
 _Bool pawClrup( pawAPI_t* paw ) {
-	if ( l_paw_hmT && !FreeLibrary( l_paw_hmT ) ) return false;
-	l_paw_hmT = NULL;
-	if ( l_paw_hmP && !FreeLibrary( l_paw_hmP ) ) return false;
-	l_paw_hmP = NULL;
-	if ( l_paw_hmN && !FreeLibrary( l_paw_hmN ) ) return false;
-	l_paw_hmN = NULL;
+	pawLibrary_t *lib;
+	for ( pawu_t i = PAW_E_LIBRARY_NTDLL;
+		i < PAW_E_LIBRARY_COUNT; ++i ) {
+		lib = &l_pawLibrary[i];
+		if ( lib->hmLibrary && !FreeLibrary( lib->hmLibrary ) )
+			return false;
+		lib->hmLibrary = NULL;
+	}
 	return true;
 }
 #endif

@@ -35,6 +35,9 @@ typedef BOOL (WINAPI *QueryFullProcessImageNameA_t)(
 typedef BOOL (WINAPI *QueryFullProcessImageNameW_t)(
 	HANDLE hProcess, DWORD  dwFlags, LPWSTR wcsDst, PDWORD p_dwCap );
 
+// Used by tlhelp32.h wrapper to avoid psapi.h's GetPerformanceInfo
+typedef BOOL (WINAPI *GlobalMemoryStatusEx_t)( LPMEMORYSTATUSEX lpBuffer );
+
 typedef BOOL (WINAPI *GetPerformanceInfo_t)(
 	PPERFORMANCE_INFORMATION pPerformanceInformation, DWORD cbSize );
 	
