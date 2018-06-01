@@ -1,3 +1,4 @@
+T?=$(or $(.T),$(TARGET),$(.TARGET),all)
 TOP?=../
 IS_WIN64:=$(if ${ProgramW6432},1,)
 IS_WIN32:=$(if ${ProgramFiles},$(if $(IS_WIN64),,1),)
@@ -24,30 +25,46 @@ PAW_MAK:=$(PAW_INC:%.h=%.h.mak) $(PAW_SRC:%.c=%.c.mak)
 VPATHS:="$(PAW_SRC_DIR)";"$(PAW_INC_DIR)"
 
 CC:=gcc
-IFLAGS:=-I"$(PAW_INC_DIR)" -I"$(PAW_SRC_DIR)"
-LFLAGS:=-L"$(PAW_INC_DIR)" -L"$(PAW_SRC_DIR)" -L"$(TOP)"
-CFLAGS:=$(IFLAGS) -Wall
-MFLAGS:=$(IFLAGS) -E -DDEF_DEP
+DBG:=gdb
+DEL:=rm -f
+INC_PATHS:=-I"$(PAW_INC_DIR)" -I"$(PAW_SRC_DIR)"
+LIB_PATHS:=-L"$(PAW_INC_DIR)" -L"$(PAW_SRC_DIR)" -L"$(TOP)"
+LFLAGS:=-shared $(if $(IS_MSWIN),-mwindows,) $(INC_PATHS) $(LIB_PATHS)
+EFLAGS:=$(if $(IS_MSWIN),-mwindows,) $(INC_PATHS) $(LIB_PATHS)
+CFLAGS:=$(INC_PATHS) -Wall
+MFLAGS:=$(INC_PATHS) -E -DDEF_DEP
+PAWLIB:=$(TOP)$(LIB_PFX)paw$(LIB_SFX)
+PAWCHK:=$(TOP)pawchk$(APP_SFX)
+PAWCHK_OBJ:=$(PAW_SRC_SYS)/test.c.o
+PAWCHK_MAK:=$(PAW_SRC_SYS)/test.c.mak
+PAWALL:=$(PAWLIB) $(PAWCHK)
+PAWALL_OBJ:=$(PAW_OBJ) $(PAWCHK_OBJ)
+PAWALL_MAK:=$(PAW_MAK) $(PAWCHK_MAK)
 
 # Compile everything
 
-all: test
-	@echo all
+.PHONY all: $(PAWALL)
+	@echo all: $^
 
-include $(PAW_MAK) $(PAW_SRC_SYS)/test.c.mak
+.PHONY rebuild: clean all
+
+,PHONY clean: $(PAWALL) $(PAWALL_OBJ) $(PAWALL_MAK)
+	$(DEL) $<
+
+include $(PAWALL_MAK)
 
 # Compile paw into a library file
 
-shared: $(PAW_OBJ)
-	@echo shared
-	$(CC) -shared -mwindows $(LFLAGS) $(patsubst %,"%",$(PAW_OBJ)) -o "$(TOP)$(LIB_PFX)paw$(LIB_SFX)"
+$(PAWLIB): $(PAW_OBJ)
+	@echo $(PAWLIB)
+	$(CC) $(LFLAGS) $(patsubst %,"%",$^) -o "$@"
 
 # Compile a test app
 
-test: shared $(PAW_SRC_SYS)/test.c.o
-	@echo test
-	$(CC) $(LFLAGS) -l $(LIB_PFX)paw$(LIB_SFX) "$(PAW_SRC_SYS)/text.c.o" -o "$(TOP)test$(APP_SFX)"
-	$(TOP)test$(APP_SFX)
+$(PAWCHK): $(PAWLIB) $(PAWCHK_OBJ)
+	@echo $@
+	$(CC) $(EFLAGS) $(PAWCHK_OBJ) -l paw$(SYS32) -o "$@"
+	$(DGB) "$@"
 
 # Compile *.mak options
 
@@ -60,10 +77,10 @@ test: shared $(PAW_SRC_SYS)/test.c.o
 
 %.c.o: %.c
 	@echo %%.c
-	$(CC) -c "$^" -o "$@" $(CFLAGS)
+	$(CC) -c -std=c99 "$<" -o "$@" $(CFLAGS)
 
 %.cpp.o: %.cpp
 	@echo %%.cpp
-	$(CC) -c "$^" -o "$@" $(CFLAGS)
+	$(CC) -c "$<" -o "$@" $(CFLAGS)
 	
 .FORCE:

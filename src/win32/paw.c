@@ -388,10 +388,12 @@ _Bool pawAPI_psapi( pawAPI_t *paw ) {
 	return true;
 }
 // For main()
-_Bool pawSetup( pawAPI_t *paw, pawul_t ulBaseAPI ) {
+_Bool pawAPI( pawAPI_t *paw, pawul_t ulBaseAPI ) {
+	pawLibrary_t *lib;
 	// Ensure both APIs can be accessed internally
 	_Bool bPsapi = pawAPI_psapi( &l_pawAPI[0] );
 	_Bool bTlhelp32 = pawAPI_tlhelp32( &l_pawAPI[1] );
+	if ( !paw ) goto cleanAPI;
 	// Make sure both APIs have their wrapper functions set
 	switch ( ulBaseAPI ) {
 		default:
@@ -410,9 +412,7 @@ _Bool pawSetup( pawAPI_t *paw, pawul_t ulBaseAPI ) {
 	}
 	(void)memset( paw, 0, sizeof( pawAPI_t ) );
 	return false;
-}
-_Bool pawClrup( pawAPI_t* paw ) {
-	pawLibrary_t *lib;
+	cleanAPI:
 	for ( pawu_t i = PAW_E_LIBRARY_NTDLL;
 		i < PAW_E_LIBRARY_COUNT; ++i ) {
 		lib = &l_pawLibrary[i];
