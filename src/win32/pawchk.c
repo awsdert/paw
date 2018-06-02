@@ -4,23 +4,28 @@ $(PAW_SRC_DIR)/win32/test.c: $(PAW_INC_DIR)/paw.h
 #	include <paw.h>
 #	include <stdio.h>
 #	include <string.h>
-int CALLBACK WinMain(
+INT WINAPI WinMain(
   HINSTANCE hInstance,
   HINSTANCE hPrevInstance,
   LPSTR     lpCmdLine,
   int       nCmdShow
 ) {
-	int result = 0;
-#	ifdef _WIN64
-	HMODULE hPaw = LoadLibrary( TEXT("paw64.dll") );
+#	ifdef OS_WIN64
+	char *strPawLib = ".\\paw64.dll";
 #	else
-	HMODULE hPaw = LoadLibrary( TEXT("paw32.dll") );
+	char *strPawLib = ".\\paw32.dll";
 #	endif
-	puts( "Console Test of paw#.dll" );
+	HMODULE hPaw = GetModuleHandleA( strPawLib );
+	int result = 0, err1 = GetLastError(), err2 = 0;
+	HMODULE hPawMustFree = hPaw ? NULL : LoadLibraryA( strPawLib );
+	printf( "Console Test of %s\n", strPawLib );
 	puts( "Starting..." );
+	if ( !hPaw ) hPaw = hPawMustFree;
 	if ( !hPaw ) {
+		err2 = GetLastError();
 		result = -1;
-		puts( "Failed to load paw#.dll" );
+		printf( "Failed to load %s\n", strPawLib );
+		printf( "err1: %i\nerr2: %i\n", err1, err2 );
 		goto fail;
 	}
 	pawAPI_t paw = {0};
@@ -42,8 +47,8 @@ int CALLBACK WinMain(
 	done:
 	pawAPI( NULL, 0 );
 	fail:
-	if ( hPaw )
-		FreeLibrary( hPaw );
+	if ( hPawMustFree )
+		FreeLibrary( hPawMustFree );
 	puts( "Exiting..." );
 	return result;
 }

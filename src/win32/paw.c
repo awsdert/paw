@@ -1,5 +1,5 @@
 #ifdef DEF_DEP
-win32/paw.c: win32/paw.h
+$(PAW_SRC_DIR)/win32/paw.c: $(PAW_SRC_DIR)/win32/paw.h
 #else
 #	include "paw.h"
 
@@ -18,8 +18,8 @@ static TCHAR *l_libraries[PAW_E_LIBRARY_COUNT] = {
 	TEXT("ToolHelp32.dll"),
 	TEXT("Psapi.dll")
 };
-static pawLibrary_t l_pawLibrary[PAW_E_LIBRARY_COUNT] = {{NULL}};
-HMODULE pawGetLibrary( PAW_E_LIBRARY_t eLib ) {
+static pawLibrary_t l_pawLibrary[PAW_E_LIBRARY_COUNT] = {NULL};
+HMODULE PAW_API pawGetLibrary( PAW_E_LIBRARY_t eLib ) {
 	pawLibrary_t *lib = &l_pawLibrary[eLib];
 	if ( !lib->hmLibrary )
 		lib->hmLibrary = LoadLibrary( l_libraries[eLib] );
@@ -43,7 +43,7 @@ static NtQueryInformationProcess_t	l_NtQueryInformationProcess = NULL;
 static QueryFullProcessImageNameA_t  l_QueryFullProcessImageNameA = NULL;
 static QueryFullProcessImageNameW_t  l_QueryFullProcessImageNameW = NULL;
 
-void pawDelIDs( pawIDs_t *IDs ) {
+void PAW_API pawDelIDs( pawIDs_t *IDs ) {
 	if ( !IDs ) return;
 	if ( IDs->dwVec )
 		free( IDs->dwVec );
@@ -51,13 +51,13 @@ void pawDelIDs( pawIDs_t *IDs ) {
 }
 
 // 1st API Wrapper
-_Bool pawGlanceNew_tlhelp32( pawGlance_t *glance, pawul_t flags, pawId_t *id ) {
+_Bool PAW_API pawGlanceNew_tlhelp32( pawGlance_t *glance, pawul_t flags, pawId_t *id ) {
 	if ( !glance ) return false;
 	memset( glance, 0, sizeof(pawGlance_t) );
 	glance->hGlance = l_CreateToolhelp32Snapshot( flags, id->dwId );
 	return glance->hGlance ? true : false;
 }
-_Bool pawRecentMemoryStats_tlhelp32(
+_Bool PAW_API pawRecentMemoryStats_tlhelp32(
 	pawProcess_t *process, pawMemStat_t *memstat ) {
 	if ( !memstat ) return false;
 	MEMORYSTATUSEX msx = {0};
@@ -82,7 +82,7 @@ _Bool pawRecentMemoryStats_tlhelp32(
 	memstat->ullAvailVext = msx.ullAvailExtendedVirtual;
 	return true;
 }
-_Bool pawGlanceMemoryStats_tlhelp32(
+_Bool PAW_API pawGlanceMemoryStats_tlhelp32(
 	pawGlance_t *glance, pawMemStat_t *memstat ) {
 	if ( !memstat ) return false;
 	if ( !glance ) {
@@ -98,7 +98,7 @@ _Bool pawGlanceMemoryStats_tlhelp32(
 	CloseHandle( process.hProcess );
 	return result;
 }
-_Bool pawGlance1stProcess_tlhelp32( pawGlance_t *glance, pawId_t *id ) {
+_Bool PAW_API pawGlance1stProcess_tlhelp32( pawGlance_t *glance, pawId_t *id ) {
 	pawIDs_t *IDs;
 	if ( !glance ||
 		!l_Process1stA( glance->hGlance, &(glance->pe32Entry) ) )
@@ -111,14 +111,14 @@ _Bool pawGlance1stProcess_tlhelp32( pawGlance_t *glance, pawId_t *id ) {
 	IDs->cbCap = sizeof(DWORD);
 	return true;
 }
-_Bool pawGlanceNxtProcess_tlhelp32( pawGlance_t *glance, pawId_t *id ) {
+_Bool PAW_API pawGlanceNxtProcess_tlhelp32( pawGlance_t *glance, pawId_t *id ) {
 	if ( !glance ||
 		!l_ProcessNxtA( glance->hGlance, &(glance->pe32Entry) ) )
 		return false;
 	if ( id ) id->dwId = glance->pe32Entry.th32ProcessID;
 	return true;
 }
-_Bool pawGlance1stLibrary_tlhelp32( pawGlance_t *glance, pawId_t *id ) {
+_Bool PAW_API pawGlance1stLibrary_tlhelp32( pawGlance_t *glance, pawId_t *id ) {
 	if ( !glance ||
 		!l_Module1stA( glance->hGlance, &(glance->me32Entry) ) )
 		return false;
@@ -130,14 +130,14 @@ _Bool pawGlance1stLibrary_tlhelp32( pawGlance_t *glance, pawId_t *id ) {
 	IDs->cbCap = sizeof(DWORD);
 	return true;
 }
-_Bool pawGlanceNxtLibrary_tlhelp32( pawGlance_t *glance, pawId_t *id ) {
+_Bool PAW_API pawGlanceNxtLibrary_tlhelp32( pawGlance_t *glance, pawId_t *id ) {
 	if ( !glance ||
 		!l_Module1stA( glance->hGlance, &(glance->me32Entry) ) )
 		return false;
 	if ( id ) id->dwId = glance->pe32Entry.th32ModuleID;
 	return true;
 }
-_Bool pawGlanceDel_tlhelp32( pawGlance_t *glance ) {
+_Bool PAW_API pawGlanceDel_tlhelp32( pawGlance_t *glance ) {
 	if ( glance ) {
 		if ( CloseHandle( glance->hGlance ) == TRUE ) {
 			free(glance);
@@ -158,12 +158,12 @@ char *pawTLHELP32_names[] = {
 	"K32Module32Next"
 	"K32Module32NextW"
 };
-char const * const pawFunc_tlhelp32( pawu_t index ) {
+char const * const PAW_API pawFunc_tlhelp32( pawu_t index ) {
 	if ( index >= 5 || ( pawTLHELP32_from != 0 && pawTLHELP32_from != 3 ) )
 		return NULL;
 	return &(pawTLHELP32_names[index][pawTLHELP32_from]);
 }
-_Bool pawAPI_tlhelp32( pawAPI_t* paw ) {
+_Bool PAW_API pawAPI_tlhelp32( pawAPI_t* paw ) {
 	HMODULE hm = NULL, hmT = NULL,
 		hmK = pawGetLibrary(PAW_E_LIBRARY_KERNEL32);
 	if ( !paw || !hmK || paw->ulBaseAPI == PAW_E_BASEAPI_COUNT )
@@ -214,7 +214,7 @@ _Bool pawAPI_tlhelp32( pawAPI_t* paw ) {
 	return true;
 }
 // 2nd API Wrapper
-_Bool pawGlanceNew_psapi( pawGlance_t *glance, pawul_t flags, pawId_t *id ) {
+_Bool PAW_API pawGlanceNew_psapi( pawGlance_t *glance, pawul_t flags, pawId_t *id ) {
 	pawIDs_t *IDs;
 	DWORD *dwVec;
 	if ( !glance ) return false;
@@ -244,7 +244,7 @@ _Bool pawGlanceNew_psapi( pawGlance_t *glance, pawul_t flags, pawId_t *id ) {
 	(void)memset( IDs, 0, sizeof( pawIDs_t ) );
 	return false;
 }
-DWORD pawGetParentId_psapi( pawId_t *id ) {
+DWORD PAW_API pawGetParentId_psapi( pawId_t *id ) {
 	DWORD pid = 0;
 	NTSTATUS ntStatus;
 	ULONG_PTR pbi[6] = {0};
@@ -264,7 +264,7 @@ DWORD pawGetParentId_psapi( pawId_t *id ) {
 	CloseHandle( hProc );
 	return pid;
 }
-_Bool pawGlanceMemoryStats_psapi(
+_Bool PAW_API pawGlanceMemoryStats_psapi(
 	pawGlance_t *glance, pawMemStat_t *memstat ) {
 	pawProcess_t process;
 	if ( !glance ) return false;
@@ -278,7 +278,7 @@ _Bool pawGlanceMemoryStats_psapi(
 	CloseHandle( process.hProcess );
 	return result;
 }
-_Bool pawGlance1stProcess_psapi( pawGlance_t *glance, pawId_t *id ) {
+_Bool PAW_API pawGlance1stProcess_psapi( pawGlance_t *glance, pawId_t *id ) {
 	pawu_t i = 0;
 	pawId_t pid;
 	if ( !glance ) return false;
@@ -296,7 +296,7 @@ _Bool pawGlance1stProcess_psapi( pawGlance_t *glance, pawId_t *id ) {
 	if ( id ) id->dwId = IDs->dwVec[i];
 	return true;
 }
-_Bool pawGlanceNxtProcess_psapi( pawGlance_t *glance, pawId_t *id ) {
+_Bool PAW_API pawGlanceNxtProcess_psapi( pawGlance_t *glance, pawId_t *id ) {
 	pawu_t i = 0;
 	pawId_t pid;
 	if ( !glance ) return false;
@@ -316,11 +316,11 @@ _Bool pawGlanceNxtProcess_psapi( pawGlance_t *glance, pawId_t *id ) {
 	if ( id ) id->dwId = IDs->dwVec[i];
 	return true;
 }
-_Bool pawGlance1stLibrary_psapi( pawGlance_t *glance, pawId_t *id ) {
+_Bool PAW_API pawGlance1stLibrary_psapi( pawGlance_t *glance, pawId_t *id ) {
 	return false; }
-_Bool pawGlanceNxtLibrary_psapi( pawGlance_t *glance, pawId_t *id ) {
+_Bool PAW_API pawGlanceNxtLibrary_psapi( pawGlance_t *glance, pawId_t *id ) {
 	return false; }
-_Bool pawGlanceDel_psapi( pawGlance_t *glance ) {
+_Bool PAW_API pawGlanceDel_psapi( pawGlance_t *glance ) {
 	if ( glance ) {
 		pawDelIDs( &glance->processIDs );
 		pawDelIDs( &glance->libraryIDs );
@@ -336,12 +336,12 @@ char *pawPSAPI_names[] = {
 	"K32QueryFullProcessImageNameA"
 	"K32QueryFullProcessImageNameW"
 };
-char const * const pawFunc_psapi( pawu_t index ) {
+char const * const PAW_API pawFunc_psapi( pawu_t index ) {
 	if ( index >= 4 || ( pawPSAPI_from != 0 && pawPSAPI_from != 2 ) )
 		return NULL;
 	return &(pawPSAPI_names[index][pawPSAPI_from]);
 }
-_Bool pawAPI_psapi( pawAPI_t *paw ) {
+_Bool PAW_API pawAPI_psapi( pawAPI_t *paw ) {
 	HMODULE hm = NULL, hmP = NULL,
 		hmN = pawGetLibrary(PAW_E_LIBRARY_NTDLL),
 		hmK = pawGetLibrary(PAW_E_LIBRARY_KERNEL32);
@@ -388,7 +388,7 @@ _Bool pawAPI_psapi( pawAPI_t *paw ) {
 	return true;
 }
 // For main()
-_Bool pawAPI( pawAPI_t *paw, pawul_t ulBaseAPI ) {
+_Bool PAW_API pawAPI( pawAPI_t *paw, pawul_t ulBaseAPI ) {
 	pawLibrary_t *lib;
 	// Ensure both APIs can be accessed internally
 	_Bool bPsapi = pawAPI_psapi( &l_pawAPI[0] );

@@ -1,83 +1,167 @@
-T?=$(or $(.T),$(TARGET),$(.TARGET),all)
 TOP?=../
-IS_WIN64:=$(if ${ProgramW6432},1,)
-IS_WIN32:=$(if ${ProgramFiles},$(if $(IS_WIN64),,1),)
-IS_MSWIN:=$(if $(or $(IS_WIN64),$(IS_WIN32)),1,)
-IS_POSIX:=$(if $(IS_MSWIN),,1)
+WINDIR?=$(shell echo %WINDIR%)
+IS_MSWIN:=$(if $(WINDIR),1,)
+IS_WIN64:=$(if $(WINDIR),$(if $(wildcard $(WINDIR)\SysWOW64),1,),)
+IS_WIN32:=$(if $(WINDIR),$(if $(wildcard $(WINDIR)\SysWOW64),,1),)
+IS_POSIX:=$(if $(WINDIR),,1)
 SYS:=$(if $(IS_MSWIN),win32,posix)
-SYS32?=$(if $(IS_MSWIN),$(if $(IS_WIN64),64,32),)
-LIB_PFX:=$(if $(IS_MSWIN),,lib)
-LIB_SFX:=$(SYS32)$(if $(IS_MSWIN),.dll,.so)
-EXE_SFX:=$(if $(IS_MSWIN),.exe,)
-APP_SFX:=$(SYS32)$(EXE_SFX)
-OBJ_SFX:=.$(if $(IS_MSWIN),win$(SYS32).o,posix.o)
 
 PAW_INC_DIR:=$(TOP)include
 PAW_INC_SYS:=$(PAW_INC_DIR)/$(SYS)
 PAW_SRC_DIR:=$(TOP)src
 PAW_SRC_SYS:=$(PAW_SRC_DIR)/$(SYS)
 
-PAW_SRC:=$(PAW_SRC_SYS)/paw.c $(PAW_SRC_SYS)/shared.c
-PAW_CPP:=
 PAW_INC:=$(PAW_SRC_SYS)/paw.h $(PAW_INC_DIR)/paw.h
-PAW_OBJ:=$(PAW_SRC:%.c=%.c$(OBJ_SFX)) $(PAW_CPP:%.cpp=%.cpp$(OBJ_SFX))
-PAW_MAK:=$(PAW_INC:%.h=%.h.mak) $(PAW_SRC:%.c=%.c.mak)
 
 VPATHS:="$(PAW_SRC_DIR)";"$(PAW_INC_DIR)"
 
 CC:=gcc
 DBG:=gdb
-DEL:=rm -f
+DEL:=rm *
 INC_PATHS:=-I"$(PAW_INC_DIR)" -I"$(PAW_SRC_DIR)"
 LIB_PATHS:=-L"$(PAW_INC_DIR)" -L"$(PAW_SRC_DIR)" -L"$(TOP)"
-LFLAGS:=-fPIC -shared $(if $(IS_MSWIN),-mwindows,) $(INC_PATHS) $(LIB_PATHS)
-EFLAGS:=$(if $(IS_MSWIN),-mwindows,) $(INC_PATHS) $(LIB_PATHS)
+LFLAGS:=$(INC_PATHS) -shared
+EFLAGS:=$(INC_PATHS) $(LIB_PATHS)
 CFLAGS:=$(INC_PATHS) -Wall
 MFLAGS:=$(INC_PATHS) -E -DDEF_DEP
-PAWLIB:=$(TOP)$(LIB_PFX)paw$(LIB_SFX)
-PAWCHK:=$(TOP)pawchk$(APP_SFX)
-PAWCHK_OBJ:=$(PAW_SRC_SYS)/pawchk.c$(OBJ_SFX)
-PAWCHK_MAK:=$(PAW_SRC_SYS)/pawchk.c.mak
-PAWALL:=$(PAWLIB) $(PAWCHK)
-PAWALL_OBJ:=$(PAW_OBJ) $(PAWCHK_OBJ)
-PAWALL_MAK:=$(PAW_MAK) $(PAWCHK_MAK)
+
+PAWALL=
+PAWALL_OBJ=
+PAWALL_MAK=$(PAW_INC:%=%.mak)
+
+PAWLIB_PFX:=paw
+PAWLIB_INC:=
+PAWLIB_SRC:=$(PAWLIB_PFX).c shared.c
+
+PAWCHK_PFX:=pawchk
+PAWCHK_INC:=
+PAWCHK_SRC:=$(PAWCHK_PFX).c
+
+WIN64_FLAGS:=-mwindows -D _WIN64 -D _WIN32 -D OS_WIN64
+WIN64_OBJ_SFX:=.win64.o
+WIN64_PAWLIB:=$(TOP)$(PAWLIB_PFX)64.dll
+WIN64_PAWLIB_A:=$(TOP)$(PAWLIB_PFX)64.a
+WIN64_PAWLIB_SRC:=$(PAWLIB_SRC:%=$(PAW_SRC_DIR)/win32/%)
+WIN64_PAWLIB_OBJ:=$(WIN64_PAWLIB_SRC:%=%$(WIN64_OBJ_SFX))
+WIN64_PAWCHK:=$(TOP)$(PAWCHK_PFX)64.exe
+WIN64_PAWCHK_SRC:=$(PAW_SRC_DIR)/win32/$(PAWCHK_SRC)
+WIN64_PAWCHK_OBJ:=$(WIN64_PAWCHK_SRC:%=%$(WIN64_OBJ_SFX))
+WIN64_PAWALL:=$(WIN64_PAWLIB) $(WIN64_PAWCHK)
+WIN64_PAWALL_OBJ:=$(WIN64_PAWLIB_OBJ) $(WIN64_PAWCHK_OBJ)
+PAWALL+=$(WIN64_PAWALL)
+PAWALL_OBJ+=$(WIN64_PAWALL_OBJ)
+PAWALL_MAK+=$(WIN64_PAWLIB_SRC:%=%.mak) $(WIN64_PAWCHK_SRC:%=%.mak)
+
+WIN32_FLAGS:=-mwindows -U _WIN64 -D _WIN32 -D OS_WIN32
+WIN32_OBJ_SFX:=.win32.o
+WIN32_PAWLIB:=$(TOP)$(PAWLIB_PFX)32.dll
+WIN32_PAWLIB_A:=$(TOP)$(PAWLIB_PFX)32.a
+WIN32_PAWLIB_SRC:=$(PAWLIB_SRC:%=$(PAW_SRC_DIR)/win32/%)
+WIN32_PAWLIB_OBJ:=$(WIN32_PAWLIB_SRC:%=%$(WIN32_OBJ_SFX))
+WIN32_PAWCHK:=$(TOP)$(PAWCHK_PFX)32.exe
+WIN32_PAWCHK_SRC:=$(PAW_SRC_DIR)/win32/$(PAWCHK_SRC)
+WIN32_PAWCHK_OBJ:=$(WIN32_PAWCHK_SRC:%=%$(WIN32_OBJ_SFX))
+WIN32_PAWALL:=$(WIN32_PAWLIB) $(WIN32_PAWCHK)
+WIN32_PAWALL_OBJ:=$(WIN32_PAWLIB_OBJ) $(WIN32_PAWCHK_OBJ)
+PAWALL+=$(WIN32_PAWALL)
+PAWALL_OBJ+=$(WIN32_PAWALL_OBJ)
+PAWALL_MAK+=$(WIN32_PAWLIB_SRC:%=%.mak) $(WIN32_PAWCHK_SRC:%=%.mak)
+
+POSIX_FLAGS:=-D __posix__ -D OS_POSIX
+POSIX_OBJ_SFX:=.posix.o
+POSIX_PAWLIB:=$(TOP)lib$(PAWLIB_PFX).so
+POSIX_PAWLIB_A:=$(TOP)lib$(PAWLIB_PFX).a
+POSIX_PAWLIB_SRC:=$(PAWLIB_SRC:%=$(PAW_SRC_DIR)/posix/%)
+POSIX_PAWLIB_OBJ:=$(POSIX_PAWLIB_SRC:%=%$(POSIX_OBJ_SFX))
+POSIX_PAWCHK:=$(TOP)$(PAWCHK_PFX)
+POSIX_PAWCHK_SRC:=$(PAW_SRC_DIR)/posix/$(PAWCHK_SRC)
+POSIX_PAWCHK_OBJ:=$(PAWCHK_SRC:%=%$(POSIX_OBJ_SFX))
+POSIX_PAWALL:=$(POSIX_PAWLIB) $(POSIX_PAWCHK)
+POSIX_PAWALL_OBJ:=$(POSIX_PAWLIB_OBJ) $(POSIX_PAWCHK_OBJ)
+PAWALL+=$(POSIX_PAWALL)
+PAWALL_OBJ+=$(POSIX_PAWALL_OBJ)
+PAWALL_MAK+=$(POSIX_PAWLIB_SRC:%=%.mak) $(POSIX_PAWCHK_SRC:%=%.mak)
+
+SYS32?=$(if $(IS_WIN64),64,32)
+SYS32_LIB_PFX:=$(TOP)$(if $(IS_POSIX),lib,)
+SYS32_LIB_SFX:=$(if $(IS_MSWIN),$(SYS32).dll,.so)
+SYS32_EXE_PFX:=$(TOP)
+SYS32_EXE_SFX:=$(if $(IS_MSWIN),.exe,)
+SYS32_APP_SFX:=$(if $(IS_MSWIN),$(SYS32).exe,)
+SYS32_PAWLIB:=$(SYS32_LIB_PFX)$(PAWLIB_PFX)$(SYS32_LIB_SFX)
+SYS32_PAWCHK:=$(SYS32_EXE_PFX)$(PAWCHK_PFX)$(SYS32_APP_SFX)
+SYS32_PAWALL:=$(SYS32_PAWLIB) $(SYS32_PAWCHK)
+
+T?=$(SYS32_PAWCHK)
+
+STD_C99:=$(if $(filter %.c,$1),-std=c99,)
 
 # Compile everything
 
-all: $(PAWALL)
+run: $(T)
+	$(if $(findstring $(SYS32_EXE_SFX),$<),$(if $(findstring $(TOP),$<),$<,$(TOP)$<),)
 
-rebuild: clean all
+rebuild: clean run
 
-clean: $(PAWALL) $(PAWALL_OBJ) $(PAWALL_MAK)
-	$(DEL) $<
+clean:
+	$(DEL) $(PAWALL) $(PAWALL_OBJ)
+	
+clean_mak:
+	$(DEL) $(PAWALL_MAK)
 
 include $(PAWALL_MAK)
 
 # Compile paw into a library file
 
-$(PAWLIB): $(PAW_OBJ)
-	$(CC) $(LFLAGS) $(patsubst %,"%",$^) -o "$@"
+$(PAWLIB_PFX)64.dll: $(WIN64_PAWLIB)
+$(WIN64_PAWLIB): $(WIN64_PAWLIB_OBJ)
+	$(CC) $(WIN64_FLAGS) $(LFLAGS) $(patsubst %,"%",$^) -o "$@" -Wl,--out-implib,$(WIN64_PAWLIB_A)
+
+$(PAWLIB_PFX)32.dll: $(WIN32_PAWLIB)
+$(WIN32_PAWLIB): $(WIN32_PAWLIB_OBJ)
+	$(CC) $(WIN32_FLAGS) $(LFLAGS) $(patsubst %,"%",$^) -o "$@" -Wl,--out-implib,$(WIN32_PAWLIB_A)
+
+$(PAWLIB_PFX).so: $(POSIX_PAWLIB)
+$(POSIX_PAWLIB): $(POSIX_PAWLIB_OBJ)
+	$(CC) $(POSIX_FLAGS) $(LFLAGS) $(patsubst %,"%",$^) -o "$@" -Wl,--out-implib,$(POSIX_PAWLIB_A)
 
 # Compile a test app
 
-$(PAWCHK): $(PAWLIB) $(PAWCHK_OBJ)
-	$(CC) $(EFLAGS) $(PAWCHK_OBJ) -lpaw$(SYS32) -o "$@"
-	$(DGB) "$@"
+$(PAWCHK_PFX)64.exe: $(WIN64_PAWCHK)
+$(WIN64_PAWCHK): $(WIN64_PAWLIB) $(WIN64_PAWCHK_OBJ)
+	$(CC) $(WIN64_FLAGS) $(EFLAGS) $(WIN64_PAWCHK_OBJ) -o "$@" -lpaw64
+	
+$(PAWCHK_PFX)32.exe: $(WIN32_PAWCHK)
+$(WIN32_PAWCHK): $(WIN32_PAWLIB) $(WIN32_PAWCHK_OBJ)
+	$(CC) $(WIN32_FLAGS) $(EFLAGS) $(WIN32_PAWCHK_OBJ) -o "$@" -lpaw32
+	
+$(PAWCHK_PFX): $(POSIX_PAWCHK)
+$(POSIX_PAWCHK): $(POSIX_PAWLIB) $(POSIX_PAWCHK_OBJ)
+	$(CC) $(POSIX_FLAGS) $(EFLAGS) $(POSIX_PAWCHK_OBJ) -o "$@" -lpaw
 
 # Compile *.mak options
 
 %.mak:
-	$(CC) "$(patsubst %.mak,%,$@)" -o "$@" $(MFLAGS)
+	$(CC) $(MFLAGS) "$(patsubst %.mak,%,$@)" -o "$@"
 
 # Compile *.o options
 
-%.win32.o: %
-	$(CC) -c $(pathsubst %.c,-std=c99,$<) "$<" -o "$@" $(CFLAGS)
-	
 %.win64.o: %
-	$(CC) -c $(pathsubst %.c,-std=c99,$<) "$<" -o "$@" $(CFLAGS)
+	$(CC) $(WIN64_FLAGS) $(CFLAGS) $(call STD_C99,$<) -c "$<" -o "$@" -D PAW_BUILD_LIB
+	
+%.win32.o: %
+	$(CC) $(WIN32_FLAGS) $(CFLAGS) $(call STD_C99,$<) -c "$<" -o "$@" -D PAW_BUILD_LIB
 
 %.posix.o: %
-	$(CC) -c $(pathsubst %.c,-std=c99,$<) "$<" -o "$@" $(CFLAGS)
+	$(CC) $(POSIX_FLAGS) $(CFLAGS) $(call STD_C99,$<) -c "$<" -o "$@" -D PAW_BUILD_LIB
+
+$(WIN64_PAWCHK_OBJ): $(WIN64_PAWCHK_SRC)
+	$(CC) $(WIN64_FLAGS) $(CFLAGS) $(call STD_C99,$<) -c "$<" -o "$@"
+
+$(WIN32_PAWCHK_OBJ): $(WIN32_PAWCHK_SRC)
+	$(CC) $(WIN32_FLAGS) $(CFLAGS) $(call STD_C99,$<) -c "$<" -o "$@"
+
+$(POSIX_PAWCHK_OBJ): $(POSIX_PAWCHK_SRC)
+	$(CC) $(POSIX_FLAGS) $(CFLAGS) $(call STD_C99,$<) -c "$<" -o "$@"
 	
 .FORCE:

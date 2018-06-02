@@ -7,6 +7,42 @@ paw.h:
 #		include <stdint.h>
 #		include <stddef.h>
 
+#		ifndef OPEN_C
+#			ifdef __cplusplus
+#				define OPEN_C extern "C" {
+#				define SHUT_C }
+#			else
+#				define OPEN_C
+#				define SHUT_C
+#			endif
+#		endif
+
+#		ifndef OS_WIN64
+#			if defined(__WIN64__) || defined( __WIN64 )
+#				define OS_WIN64
+#			elif defined( _WIN64_ ) || defined( _WIN64 ) || defined( WIN64 )
+#				define OS_WIN64
+#			endif
+#		endif
+
+#		ifndef OS_WIN32
+#			if defined(__WIN32__) || defined( __WIN32 )
+#				define OS_WIN32
+#			elif defined( _WIN32_ ) || defined( _WIN32 ) || defined( WIN32 )
+#				define OS_WIN32
+#			endif
+#		endif
+
+#		ifndef OS_POSIX
+#			if defined(__posix__) || defined( __posix )
+#				define OS_POSIX
+#			elif defined( _posix_ ) || defined( _posix ) || defined( posix )
+#				define OS_POSIX
+#			endif
+#		endif
+
+OPEN_C
+
 typedef signed char pawc_t;
 typedef unsigned char pawuc_t;
 typedef signed short paws_t;
@@ -37,10 +73,12 @@ typedef struct _pawMemStat
 	pawull_t ullAvailVext; // ullAvailExtendedVirtual
 } pawMemStat_t;
 
-#		ifdef _WIN32
+#		ifdef OS_WIN32
 #			include <windows.h>
 #			include <tlhelp32.h>
 #			include <psapi.h>
+#			define PAW_EXPORT __declspec(dllexport)
+#			define PAW_IMPORT __declspec(dllimport)
 struct _pawId {
 	DWORD dwId;
 };
@@ -70,6 +108,8 @@ struct _pawLibrary { HMODULE hmLibrary; };
 struct _pawSupport { HANDLE hSupport; };
 #		else
 #			include <dirent.h>
+#			define PAW_EXPORT
+#			define PAW_IMPORT extern
 struct _pawId {
 	int iId;
 };
@@ -95,6 +135,14 @@ struct _pawGlance {
 struct _pawProcess { int iProcess; };
 struct _pawLibrary { int iLibrary; };
 struct _pawSupport { int iSupport; };
+#		endif
+
+#		ifdef PAW_BUILD_LIB
+#			define PAW_API PAW_EXPORT
+#		elif defined( PAW_BUILD_APP )
+#			define PAW_API
+#		else
+#			define PAW_API PAW_IMPORT
 #		endif
 
 #		ifdef UNICODE
@@ -225,15 +273,17 @@ done:
 while ( !pawAPI( NULL, 0 ) );
 return 0;
 */
-void pawDelIDs( pawIDs_t *IDs );
-_Bool pawAPI( pawAPI_t* paw, pawul_t ulBaseAPI );
+void PAW_API pawDelIDs( pawIDs_t *IDs );
+_Bool PAW_API pawAPI( pawAPI_t* paw, pawul_t ulBaseAPI );
 /* For functions not accessed via paw */
-void* pvFuncByStr( pawul_t ulBaseAPI, char const * const strFunc );
-void* pvFuncByWcs( pawul_t ulBaseAPI, wchar_t const * const wcsFunc );
+void* PAW_API pvFuncByStr( pawul_t ulBaseAPI, char const * const strFunc );
+void* PAW_API pvFuncByWcs( pawul_t ulBaseAPI, wchar_t const * const wcsFunc );
 #		ifdef _UNICODE
 #			define pvFuncByTcs pvFuncByWcs
 #		else
 #			define pvFuncByTcs pvFuncByStr
 #		endif
 #	endif
+
+SHUT_C
 #endif

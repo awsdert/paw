@@ -1,7 +1,7 @@
 #ifndef INC_POSIX_PAW_H
 #	define INC_POSIX_PAW_H
 #	ifdef DEF_DEP
-posix/paw.h: paw.h
+$(PAW_SRC_DIR)/posix/paw.h: $(PAW_INC_DIR)/paw.h
 #	else
 #		include <paw.h>
 #		include <stddef.h>
@@ -19,3 +19,4 @@ struct _pawLibraryA { int posix_library; };
 struct _pawLibraryW { int posix_library; };
 
 #	endif
+#endif

@@ -1,11 +1,10 @@
 #ifndef INC_WIN32_PAW_H
 #	define INC_WIN32_PAW_H
 #	ifdef DEF_DEP
-win32/paw.h: paw.h
+$(PAW_SRC_DIR)/win32/paw.h: $(PAW_INC_DIR)/paw.h
 #	else
 #		include <paw.h>
 #		include <Winternl.h>
-
 
 typedef HANDLE (WINAPI *CreateToolhelp32Snapshot_t)(
 	DWORD flags, DWORD id );

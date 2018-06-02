@@ -1,5 +1,5 @@
 #ifdef DEF_DEP
-shared.c: shared.h
+$(PAW_SRC_DIR)/win32/shared.c: $(PAW_SRC_DIR)/win32/paw.h
 #else
 #	include <windows.h>
 #	include <paw.h>
