@@ -23,7 +23,7 @@ DBG:=gdb
 DEL:=rm *
 INC_PATHS:=-I$(PAW_INC_DIR) -I$(PAW_SRC_DIR) -I$(PAW_BIN_DIR)
 LIB_PATHS:=-L$(PAW_LIB_DIR)
-LFLAGS:=$(INC_PATHS) $(LIB_PATHS) -shared
+LFLAGS:=$(INC_PATHS) $(LIB_PATHS)
 EFLAGS:=$(INC_PATHS) $(LIB_PATHS)
 CFLAGS:=$(INC_PATHS) -Wall
 MFLAGS:=$(INC_PATHS) -E -DDEF_DEP
@@ -77,7 +77,6 @@ STD_C99:=$(CFLAGS) $(if $(filter %.c,$1),-std=c99,)
 
 ENSURE_APP_PFX=$(if $(findstring $1,$2),$2,$1$2)
 IS_APP=$(if $(findstring $(SYS_APP_SFX),$1),$1,)
-OUTPUT_LIB=-o $1/$2 -Wl,--out-implib,$1/$(patsubst %.$3,%.$4,$2)
 
 # Make sure files can be found
 
@@ -102,32 +101,41 @@ clean:
 	$(DEL) $(PAWALL) $(PAWALL_OBJ)
 	
 clean_mak:
-	$(DEL) $(PAWALL_MAK)-
+	$(DEL) $(PAWALL_MAK)
 
 # Compile paw into a library file
 
+OUT_LIB_A=-Wl,--out-implib,$1/$(patsubst %.$3,%.$4,$2)
+OUT_LIB_SO=$(CC) $($1_LFLAGS) $(LFLAGS) $2 -o $3/$4
+OUT_LIB=$(call OUT_LIB_SO,$1,$2,$3,$4) $(call OUT_LIB_A,$3,$4,$5,$6)
+
 paw64.dll: $(WIN64_PAWLIB_OBJ)
-	$(CC) $(WIN64_LFLAGS) $(LFLAGS) $^ $(call OUTPUT_LIB,$(PAW_LIB_DIR),$@,dll,lib)
-	$(CC) $(WIN64_LFLAGS) $(LFLAGS) $^ -o $(PAW_BIN_DIR)/$@
+	$(call OUT_LIB,WIN64,$^,$(PAW_LIB_DIR),$@,dll,lib)
+	$(call OUT_LIB_SO,WIN64,$^,$(PAW_LIB_DIR),$@)
 
 paw32.dll: $(WIN32_PAWLIB_OBJ)
-	$(CC) $(WIN32_LFLAGS) $(LFLAGS) $^ $(call OUTPUT_LIB,$(PAW_LIB_DIR),$@,dll,lib)
-	$(CC) $(WIN32_LFLAGS) $(LFLAGS) $^ -o $(PAW_BIN_DIR)/$@
+	$(call OUT_LIB,WIN32,$^,$(PAW_LIB_DIR),$@,dll,lib)
+	$(call OUT_LIB_SO,WIN32,$^,$(PAW_LIB_DIR),$@)
 
 libpaw.so: $(POSIX_PAWLIB_OBJ)
-	$(CC) $(POSIX_LFLAGS) $(LFLAGS) $^ $(call OUTPUT_LIB,$(PAW_LIB_DIR),$@,so,a)
-	$(CC) $(POSIX_LFLAGS) $(LFLAGS) $^ -o $(PAW_BIN_DIR)/$@
+	$(call OUT_LIB,POSIX,$^,$(PAW_LIB_DIR),$@,dll,lib)
+	$(call OUT_LIB_SO,POSIX,$^,$(PAW_LIB_DIR),$@)
 
 # Compile a test app
 
-pawchk64.exe: $(WIN64_PAWLIB) $(WIN64_PAWCHK_OBJ)
-	$(CC) $(WIN64_EFLAGS) $(EFLAGS) $^ -o $(PAW_BIN_DIR)/$@
-	
-pawchk32.exe: $(WIN32_PAWLIB) $(WIN32_PAWCHK_OBJ)
-	$(CC) $(WIN32_EFLAGS) $(EFLAGS) $^ -o $(PAW_BIN_DIR)/$@
-	
-pawchk: $(POSIX_PAWLIB) $(POSIX_PAWCHK_OBJ)
-	$(CC) $(POSIX_EFLAGS) $(EFLAGS) $^ -o $(PAW_BIN_DIR)/$@
+OUT_APP=$(CC) $($1_EFLAGS) $(EFLAGS) $2 -o $(PAW_BIN_DIR)/$3
+
+pawchk64.exe: $(WIN64_PAWLIB)
+pawchk64.exe: $(WIN64_PAWCHK_OBJ)
+	$(call OUT_APP,WIN64,$^,$@)
+
+pawchk32.exe: $(WIN32_PAWLIB)
+pawchk32.exe: $(WIN32_PAWCHK_OBJ)
+	$(call OUT_APP,WIN32,$^,$@)
+
+pawchk: $(POSIX_PAWLIB)
+pawchk: $(POSIX_PAWCHK_OBJ)
+	$(call OUT_APP,POSIX,$^,$@)
 
 # Make sure directories exist
 
@@ -143,32 +151,34 @@ directories: $(PAW_BIN_DIR)/ $(PAW_LIB_DIR)/
 
 # Compile *.o options
 
+OUT_OBJ=$(CC) $($1_CFLAGS) $(call STD_C99,$2) -c $2 -o $3 
+
 %.win64.obj: %
-	$(CC) $(WIN64_CFLAGS) $(call STD_C99,$<) -c $< -o $@ -D PAW_BUILD_LIB
+	$(call OUT_OBJ,WIN64,$<,$@) -D PAW_BUILD_LIB
 	
 %.win32.obj: %
-	$(CC) $(WIN32_CFLAGS) $(call STD_C99,$<) -c $< -o $@ -D PAW_BUILD_LIB
+	$(call OUT_OBJ,WIN32,$<,$@) -D PAW_BUILD_LIB
 
 %.posix.obj: %
-	$(CC) $(POSIX_CFLAGS) $(call STD_C99,$<) -c $< -o $@ -D PAW_BUILD_LIB
+	$(call OUT_OBJ,POSIX,$<,$@) -D PAW_BUILD_LIB
 
 %.win64.o: %
-	$(CC) $(WIN64_CFLAGS) $(call STD_C99,$<) -c $< -o $@ -D PAW_BUILD_LIB
+	$(call OUT_OBJ,WIN64,$<,$@) -D PAW_BUILD_LIB
 	
 %.win32.o: %
-	$(CC) $(WIN32_CFLAGS) $(call STD_C99,$<) -c $< -o $@ -D PAW_BUILD_LIB
+	$(call OUT_OBJ,WIN32,$<,$@) -D PAW_BUILD_LIB
 
 %.posix.o: %
-	$(CC) $(POSIX_CFLAGS) $(call STD_C99,$<) -c $< -o $@ -D PAW_BUILD_LIB
+	$(call OUT_OBJ,POSIX,$<,$@) -D PAW_BUILD_LIB
 
 $(WIN64_PAWCHK_OBJ): pawchk.c
-	$(CC) $(WIN64_CFLAGS) $(call STD_C99,$<) -c $< -o $@
+	$(call OUT_OBJ,WIN64,$<,$@)
 
 $(WIN32_PAWCHK_OBJ): pawchk.c
-	$(CC) $(WIN32_CFLAGS) $(call STD_C99,$<) -c $< -o $@
+	$(call OUT_OBJ,WIN32,$<,$@)
 
 $(POSIX_PAWCHK_OBJ): pawchk.c
-	$(CC) $(POSIX_CFLAGS) $(call STD_C99,$<) -c $< -o $@
+	$(call OUT_OBJ,POSIX,$<,$@)
 
 include $(PAWALL_MAK)	
 

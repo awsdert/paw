@@ -117,6 +117,8 @@ _Bool PAW_EXP pawAPI( pawAPI_t* paw, pawul_t ulBaseAPI );
 #		include <tlhelp32.h>
 #		include <psapi.h>
 #		include <wtsapi32.h>
+typedef struct tagPROCESSENTRY32 PROCESSENTRY32A;
+typedef struct tagMODULEENTRY32 MODULEENTRY32A;
 struct _pawGlance {
 	pawul_t	ulFlags;
 	pawid_t IdParent;

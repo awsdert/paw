@@ -42,16 +42,35 @@ INT WINAPI WinMain(
 	puts( "Succeeded in opening API" );
 	puts( "Taking a glance at running processes..." );
 	pawGlance_t glance;
-	if ( !paw.glanceNew( &glance, PAW_F_GLANCE_PROCESS, 0 ) ) {
+	if ( !paw.glanceNew( &glance,
+		PAW_F_GLANCE_PROCESS | PAW_F_GLANCE_LIBRARY, 0 ) ) {
 		result = GetLastError();
 		puts("Failed to take a glance");
 		goto done;
 	}
+	pawid_t pid = 0, lid = 0, tid = GetCurrentProcessId();
+	if ( !paw.glance1stProcess( &glance, &pid ) ) {
+		result = GetLastError();
+		puts("Failed to get 1st process id");
+		goto mid_fail;
+	}
+	do {
+		printf( "%08lX:\n", (pawul_t)pid );
+		if ( pid == tid ) {
+			puts( "Me :)" );
+			if ( paw.glance1stLibrary( &glance, &lid ) ) {
+				do {
+					printf( "%04lX:\n", (pawul_t)lid );
+				} while ( paw.glanceNxtLibrary( &glance, &lid ) );
+			}
+		}
+	} while ( paw.glanceNxtProcess( &glance, &pid ) );
+	mid_fail:
 	paw.glanceDel( &glance );
 	done:
 	pawAPI( NULL, -1 );
 	fail:
-	printf( "Releasing %s if had opened it...", strPawLib );
+	printf( "Releasing %s if had opened it...\n", strPawLib );
 	if ( hPawMustFree )
 		FreeLibrary( hPawMustFree );
 	puts( "Now exiting" );

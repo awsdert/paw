@@ -7,9 +7,6 @@ OPEN_C
 #	ifdef OS_WIN32
 #		include <Winternl.h>
 
-typedef struct tagPROCESSENTRY32 PROCESSENTRY32A;
-typedef struct tagMODULEENTRY32 MODULEENTRY32A;
-
 typedef HANDLE (WINAPI *CreateToolhelp32Snapshot_t)(
 	DWORD flags, DWORD id );
 typedef WINBOOL (WINAPI *Process32First_t)(

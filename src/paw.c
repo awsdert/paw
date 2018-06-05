@@ -251,10 +251,13 @@ _Bool PAW_API pawGlanceMemoryStats_tlhelp32(
 	CloseHandle( process.hProcess );
 	return result;
 }
-_Bool PAW_API pawGlance1stProcess_tlhelp32( pawGlance_t *pGlance, pawid_t *pId ) {
+_Bool PAW_API pawGlance1stProcess_tlhelp32(
+	pawGlance_t *pGlance, pawid_t *pId ) {
 	pawIDs_t *IDs;
-	if ( !pGlance ||
-		!l_tlhelp32.pawProcess32First( pGlance->hGlance, &(pGlance->pe32Entry) ) )
+	if ( !pGlance ) return false;
+	pGlance->pe32Entry.dwSize = sizeof(PROCESSENTRY32A);
+	if ( !l_tlhelp32.pawProcess32First(
+		pGlance->hGlance, &(pGlance->pe32Entry) ) )
 		return false;
 	if ( pId ) *pId = pGlance->pe32Entry.th32ProcessID;
 	// In case someone tries to use the PSAPI wrapper
@@ -272,8 +275,10 @@ _Bool PAW_API pawGlanceNxtProcess_tlhelp32( pawGlance_t *pGlance, pawid_t *pId )
 	return true;
 }
 _Bool PAW_API pawGlance1stLibrary_tlhelp32( pawGlance_t *pGlance, pawid_t *pId ) {
-	if ( !pGlance ||
-		!l_tlhelp32.pawModule32First( pGlance->hGlance, &(pGlance->me32Entry) ) )
+	if ( !pGlance ) return false;
+	pGlance->me32Entry.dwSize = sizeof(MODULEENTRY32A);
+	if ( !l_tlhelp32.pawModule32First(
+		pGlance->hGlance, &(pGlance->me32Entry) ) )
 		return false;
 	if ( pId ) *pId = pGlance->pe32Entry.th32ModuleID;
 	// In case someone tries to use the PSAPI wrapper
