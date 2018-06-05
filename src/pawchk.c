@@ -1,9 +1,10 @@
 #ifdef DEF_DEP
-$(PAW_SRC_DIR)/win32/test.c: $(PAW_INC_DIR)/paw.h
+pawchk.c: paw.h
 #else
 #	include <paw.h>
 #	include <stdio.h>
 #	include <string.h>
+#	ifdef OS_WIN32
 INT WINAPI WinMain(
   HINSTANCE hInstance,
   HINSTANCE hPrevInstance,
@@ -16,40 +17,52 @@ INT WINAPI WinMain(
 	char *strPawLib = ".\\paw32.dll";
 #	endif
 	HMODULE hPaw = GetModuleHandleA( strPawLib );
-	int result = 0, err1 = GetLastError(), err2 = 0;
+	int result = 0, error = GetLastError();
 	HMODULE hPawMustFree = hPaw ? NULL : LoadLibraryA( strPawLib );
 	printf( "Console Test of %s\n", strPawLib );
 	puts( "Starting..." );
 	if ( !hPaw ) hPaw = hPawMustFree;
 	if ( !hPaw ) {
-		err2 = GetLastError();
-		result = -1;
+		result = GetLastError();
 		printf( "Failed to load %s\n", strPawLib );
-		printf( "err1: %i\nerr2: %i\n", err1, err2 );
+		printf( "error: %i\n", error );
 		goto fail;
 	}
 	pawAPI_t paw = {0};
-	pawAPI( &paw, 0 );
-	if ( !paw.ulBaseAPI ) {
-		result = -1;
-		puts( "Failed to setup API" );
-		goto fail;
+	if ( !pawAPI( &paw, -1 ) ) {
+		error = GetLastError();
+		printf( "Failed to get Toolhelp32 API, error: %i\n", error );
+		puts( "Trying PSAPI..." );
+		if ( !pawAPI( &paw, PAW_E_BASEAPI_PSAPI ) ) {
+			result = GetLastError();
+			puts( "Failed that as well" );
+			goto fail;
+		}
 	}
 	puts( "Succeeded in opening API" );
 	puts( "Taking a glance at running processes..." );
 	pawGlance_t glance;
-	if ( !paw.glanceNew( &glance, PAW_F_GLANCE_PROCESS, NULL ) ) {
-		result = -1;
+	if ( !paw.glanceNew( &glance, PAW_F_GLANCE_PROCESS, 0 ) ) {
+		result = GetLastError();
 		puts("Failed to take a glance");
 		goto done;
 	}
 	paw.glanceDel( &glance );
 	done:
-	pawAPI( NULL, 0 );
+	pawAPI( NULL, -1 );
 	fail:
+	printf( "Releasing %s if had opened it...", strPawLib );
 	if ( hPawMustFree )
 		FreeLibrary( hPawMustFree );
-	puts( "Exiting..." );
+	puts( "Now exiting" );
 	return result;
 }
+#	else
+int main( int argc, char *argv[] )
+{
+	puts("No test scripts available");
+	puts("Exiting...");
+	return 0;
+}
+#	endif
 #endif

@@ -1,8 +1,8 @@
 #ifdef DEF_DEP
-$(PAW_SRC_DIR)/win32/shared.c: $(PAW_SRC_DIR)/win32/paw.h
-#else
+shared.c: _paw.h
+#elif defined( OS_WIN32 )
 #	include <windows.h>
-#	include <paw.h>
+#	include "_paw.h"
 BOOL WINAPI DllMain(
   HINSTANCE hinstDLL,
   DWORD     fdwReason,
@@ -16,5 +16,9 @@ BOOL WINAPI DllMain(
 	  default: return FALSE;
   }
   return TRUE;
+}
+#else
+int dlmain( int argc, char *argv[] ) {
+	return 0;
 }
 #endif

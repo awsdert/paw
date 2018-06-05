@@ -1,7 +1,10 @@
 
-*.o
-*.a
-*.so
-*.dll
 *.mak
+*.o
+*.obj
 *.exe
+*.out
+*.dll
+*.so
+*.lib
+*.a
